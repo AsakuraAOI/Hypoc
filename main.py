@@ -11,15 +11,13 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
     QApplication, QMessageBox, QLabel, QTextEdit, QScrollArea,
-    QFileDialog, QPushButton, QSizePolicy
+    QFileDialog, QPushButton, QSizePolicy, QDialog, QLineEdit
 )
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon
 
 # Import modules
-from core.comparison import run_preset_comparison, run_custom_comparison
-from core.checkdata import parse_checkdata, build_checkdata_content
-from ui.cards import GlassCard, ResultCard
+from core.checkdata import build_checkdata_content
 from ui.tabs import create_output_check_tab, create_source_check_tab
 
 # Import check modules
@@ -41,6 +39,113 @@ COLOR_ERROR = "#EF4444"
 COLOR_WARNING = "#F59E0B"
 
 
+class ToolsConfigDialog(QDialog):
+    """配置 get_input_data.exe 和 txt_compare.exe 路径"""
+
+    def __init__(self, parent, gid_path="", tc_path=""):
+        super().__init__(parent)
+        self.setWindowTitle("配置外部工具")
+        self.setMinimumWidth(520)
+        self.setStyleSheet("background: #F5F5F5;")
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        hint = QLabel("请指定以下两个工具的路径（首次使用需配置，之后自动记住）：")
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #444; font-size: 12px;")
+        layout.addWidget(hint)
+
+        btn_style = """
+            QPushButton {
+                background-color: #2563EB; color: white;
+                border: none; border-radius: 6px; padding: 6px 14px;
+            }
+            QPushButton:hover { background-color: #1D4ED8; }
+        """
+        edit_style = """
+            QLineEdit {
+                background: white; border: 1px solid #E0E0E0;
+                border-radius: 6px; padding: 6px; color: #1A1A1A; font-size: 12px;
+            }
+        """
+
+        # get_input_data
+        gid_label = QLabel("get_input_data.exe")
+        gid_label.setStyleSheet("color: #1A1A1A; font-size: 12px; font-weight: bold;")
+        layout.addWidget(gid_label)
+        gid_row = QHBoxLayout()
+        self.gid_edit = QLineEdit(gid_path)
+        self.gid_edit.setPlaceholderText("未配置")
+        self.gid_edit.setStyleSheet(edit_style)
+        gid_browse = QPushButton("浏览")
+        gid_browse.setStyleSheet(btn_style)
+        gid_browse.clicked.connect(lambda: self._browse(self.gid_edit))
+        gid_row.addWidget(self.gid_edit, 1)
+        gid_row.addWidget(gid_browse)
+        layout.addLayout(gid_row)
+
+        # txt_compare
+        tc_label = QLabel("txt_compare.exe")
+        tc_label.setStyleSheet("color: #1A1A1A; font-size: 12px; font-weight: bold;")
+        layout.addWidget(tc_label)
+        tc_row = QHBoxLayout()
+        self.tc_edit = QLineEdit(tc_path)
+        self.tc_edit.setPlaceholderText("未配置")
+        self.tc_edit.setStyleSheet(edit_style)
+        tc_browse = QPushButton("浏览")
+        tc_browse.setStyleSheet(btn_style)
+        tc_browse.clicked.connect(lambda: self._browse(self.tc_edit))
+        tc_row.addWidget(self.tc_edit, 1)
+        tc_row.addWidget(tc_browse)
+        layout.addLayout(tc_row)
+
+        # 按钮行
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        ok_btn = QPushButton("确定")
+        ok_btn.setStyleSheet(btn_style)
+        ok_btn.clicked.connect(self.accept)
+        cancel_btn = QPushButton("取消")
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent; color: #666;
+                border: 1px solid #E0E0E0; border-radius: 6px; padding: 6px 14px;
+            }
+            QPushButton:hover { background-color: #F0F0F0; }
+        """)
+        cancel_btn.clicked.connect(self.reject)
+        btn_row.addWidget(cancel_btn)
+        btn_row.addWidget(ok_btn)
+        layout.addLayout(btn_row)
+
+    def _browse(self, edit: QLineEdit):
+        path, _ = QFileDialog.getOpenFileName(self, "选择", "", "Executable (*.exe)")
+        if path:
+            edit.setText(path)
+
+    def get_paths(self):
+        return self.gid_edit.text().strip(), self.tc_edit.text().strip()
+
+
+class TestWorker(QThread):
+    """在后台线程运行比对函数，避免阻塞 UI"""
+    done = pyqtSignal(str, int)   # (txt_compare 原始输出, 用例数)
+    failed = pyqtSignal(str)      # 错误信息
+
+    def __init__(self, fn):
+        super().__init__()
+        self._fn = fn
+
+    def run(self):
+        try:
+            raw, count = self._fn()
+            self.done.emit(raw, count)
+        except Exception as e:
+            self.failed.emit(str(e))
+
+
 class HypocWindow(QMainWindow):
     """Hypoc 主窗口"""
     def __init__(self):
@@ -49,6 +154,7 @@ class HypocWindow(QMainWindow):
         self.checkdata_content = ""  # checkdata文件内容
         self.setup_window()
         self.setup_ui()
+        self.populate_preset_checkdata()
 
     def setup_window(self):
         self.setWindowTitle("Hypoc")
@@ -80,9 +186,13 @@ class HypocWindow(QMainWindow):
         title.setStyleSheet("color: #1A1A1A; font-size: 20px; font-weight: bold;")
         header_layout.addWidget(title)
 
-        hint = QLabel("水平有限，仅供参考")
+        hint = QLabel("程序测试与验证系统")
         hint.setStyleSheet("color: #999999; font-size: 11px;")
         header_layout.addWidget(hint)
+
+        disclaimer = QLabel("水平有限，仅供参考")
+        disclaimer.setStyleSheet("color: #CCCCCC; font-size: 10px;")
+        header_layout.addWidget(disclaimer)
 
         header_layout.addStretch()
         main_layout.addLayout(header_layout)
@@ -158,6 +268,14 @@ class HypocWindow(QMainWindow):
             self.checkdata_file_label.setText(Path(path).name)
             with open(path, 'r', encoding='utf-8') as f:
                 self.checkdata_content = f.read()
+
+    def populate_preset_checkdata(self):
+        """用 data/checkdata/ 里的文件填充预设 checkdata 下拉框"""
+        from core.comparison import CHECKDATA_DIR
+        self.checkdata_preset_combo.clear()
+        if CHECKDATA_DIR.exists():
+            names = sorted(p.stem for p in CHECKDATA_DIR.glob("*.txt"))
+            self.checkdata_preset_combo.addItems(names)
 
     def select_source_file(self):
         """选择源码文件"""
@@ -279,8 +397,113 @@ class HypocWindow(QMainWindow):
         else:  # 自定义模式
             self.run_custom_test()
 
+    def open_tools_config(self):
+        """打开工具配置对话框"""
+        from core.ext_comparison import locate_tools, save_tools_config
+        from core.comparison import get_base_dir
+        base_dir = str(get_base_dir())
+
+        # 读取已有路径（如果有）
+        gid_cur, tc_cur = "", ""
+        try:
+            gid_cur, tc_cur = locate_tools(base_dir)
+        except FileNotFoundError:
+            pass
+
+        dlg = ToolsConfigDialog(self, gid_cur, tc_cur)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            gid, tc = dlg.get_paths()
+            if not gid or not tc:
+                QMessageBox.warning(self, "警告", "两个路径都必须填写")
+                return
+            from pathlib import Path
+            if not Path(gid).exists():
+                QMessageBox.warning(self, "警告", f"文件不存在:\n{gid}")
+                return
+            if not Path(tc).exists():
+                QMessageBox.warning(self, "警告", f"文件不存在:\n{tc}")
+                return
+            save_tools_config(base_dir, gid, tc)
+            QMessageBox.information(self, "已保存", "工具路径已保存，可以开始测试了。")
+
+    def _get_tools(self):
+        """获取工具路径，找不到时弹出配置对话框。返回 (gid, tc) 或 None（用户取消）"""
+        from core.ext_comparison import locate_tools, save_tools_config
+        from core.comparison import get_base_dir
+        base_dir = str(get_base_dir())
+
+        try:
+            return locate_tools(base_dir)
+        except FileNotFoundError:
+            pass
+
+        # 自动弹出配置对话框
+        QMessageBox.information(
+            self, "需要配置工具",
+            "首次使用需要指定 get_input_data.exe 和 txt_compare.exe 的路径。\n"
+            "路径配置后会自动记住，下次无需重新配置。"
+        )
+        dlg = ToolsConfigDialog(self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return None
+        gid, tc = dlg.get_paths()
+        from pathlib import Path
+        if not gid or not tc or not Path(gid).exists() or not Path(tc).exists():
+            QMessageBox.warning(self, "配置无效", "路径无效，请重新配置")
+            return None
+        save_tools_config(base_dir, gid, tc)
+        return gid, tc
+
+    # ==========================================================================
+    # 测试结果共享处理
+    # ==========================================================================
+
+    def _start_test(self, work_fn, cleanup_fn=None):
+        """启动后台测试线程，work_fn 返回 (raw_output, case_count)"""
+        self.output_status.setText("运行中...")
+        self.output_status.setStyleSheet("color: #2563EB;")
+        self.output_start_btn.setEnabled(False)
+
+        while self.output_results_container.count():
+            child = self.output_results_container.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+        self._worker = TestWorker(work_fn)
+        self._worker.done.connect(self._on_test_done)
+        self._worker.failed.connect(self._on_test_failed)
+        if cleanup_fn:
+            self._worker.finished.connect(cleanup_fn)
+        self._worker.start()
+
+    def _on_test_done(self, raw, count):
+        result_edit = QTextEdit()
+        result_edit.setReadOnly(True)
+        result_edit.setPlainText(raw)
+        result_edit.setStyleSheet(
+            "background: #FAFAFA; border: none; "
+            "font-family: monospace; font-size: 12px; color: #1A1A1A;"
+        )
+        self.output_results_container.addWidget(result_edit)
+        self.output_status.setText(f"完成 ({count} 组)")
+        self.output_status.setStyleSheet(f"color: {COLOR_SUCCESS};")
+        self.output_start_btn.setEnabled(True)
+
+    def _on_test_failed(self, msg):
+        self.output_status.setText(f"错误: {msg}")
+        self.output_status.setStyleSheet(f"color: {COLOR_ERROR};")
+        self.output_start_btn.setEnabled(True)
+
+    # ==========================================================================
+    # Output Test Methods
+    # ==========================================================================
+
     def run_preset_test(self):
-        """运行预设模式测试"""
+        """运行预设模式测试（get_input_data + txt_compare）"""
+        import json, tempfile, os
+        from core.ext_comparison import run_preset_external_comparison, parse_data_file
+        from core.comparison import get_base_dir, CHECKDATA_DIR, DEMORAW_DIR
+
         exe_path = self.file_paths.get("preset_exe")
         if not exe_path:
             self.output_status.setText("请先选择程序文件")
@@ -289,106 +512,123 @@ class HypocWindow(QMainWindow):
 
         problem = self.preset_problem_combo.currentText()
 
-        # 预设模式使用程序提供的checkdata，无需用户选择
-
-        self.output_status.setText("运行中...")
-        self.output_status.setStyleSheet("color: #2563EB;")
-        self.output_start_btn.setEnabled(False)
-
-        # 清除之前的结果
-        while self.output_results_container.count():
-            child = self.output_results_container.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
-
-        try:
-            results = run_preset_comparison(exe_path, problem)
-
-            passed = sum(1 for r in results if r.status == "PASS")
-            failed = len(results) - passed
-
-            # 显示摘要
-            summary = QLabel(f"完成: {passed}/{len(results)} 通过" + (" ✓" if failed == 0 else " ✗"))
-            summary.setStyleSheet(f"color: {'#22C55E' if failed == 0 else '#EF4444'}; font-size: 14px; font-weight: bold;")
-            self.output_results_container.addWidget(summary)
-
-            # 显示结果卡片
-            for result in results:
-                card = ResultCard(result)
-                self.output_results_container.addWidget(card)
-
-            self.output_status.setText(f"完成: {passed}/{len(results)} 通过, {failed} 失败")
-            self.output_status.setStyleSheet(f"color: {'#22C55E' if failed == 0 else '#EF4444'};")
-
-        except Exception as e:
-            self.output_status.setText(f"错误: {str(e)}")
+        demo_json = DEMORAW_DIR / f"{problem}-demo_output.json"
+        if not demo_json.exists():
+            self.output_status.setText(f"未找到期望输出文件: {demo_json.name}")
             self.output_status.setStyleSheet(f"color: {COLOR_ERROR};")
-        finally:
-            self.output_start_btn.setEnabled(True)
+            return
+
+        with open(demo_json, "r", encoding="utf-8") as f:
+            demo_data = json.load(f)
+        expected_hex_map = {
+            tc["case_id"]: tc.get("output_hex", "")
+            for tc in demo_data.get("test_cases", [])
+        }
+
+        checkdata_file = CHECKDATA_DIR / f"{problem}.txt"
+        if not checkdata_file.exists():
+            entries = [(tc["case_id"], tc.get("input_text", ""))
+                       for tc in demo_data.get("test_cases", [])]
+            content = build_checkdata_content(entries)
+            fd, checkdata_path = tempfile.mkstemp(suffix=".txt")
+            os.close(fd)
+            with open(checkdata_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            cleanup_fn = lambda: os.path.exists(checkdata_path) and os.unlink(checkdata_path)
+        else:
+            checkdata_path = str(checkdata_file)
+            cleanup_fn = None
+
+        tools = self._get_tools()
+        if tools is None:
+            if cleanup_fn:
+                cleanup_fn()
+            return
+        gid_exe, tc_exe = tools
+
+        case_ids = parse_data_file(checkdata_path)
+
+        def work():
+            raw = run_preset_external_comparison(
+                data_file=checkdata_path,
+                case_ids=case_ids,
+                user_exe=exe_path,
+                gid_exe=gid_exe,
+                tc_exe=tc_exe,
+                expected_hex_map=expected_hex_map,
+            )
+            return raw, len(case_ids)
+
+        self._start_test(work, cleanup_fn)
 
     def run_custom_test(self):
-        """运行自定义模式测试"""
+        """运行自定义模式测试（get_input_data + txt_compare）"""
+        import tempfile, os
+        from core.ext_comparison import run_external_comparison, parse_data_file
+        from core.comparison import CHECKDATA_DIR
+
         demo_path = self.file_paths.get("custom_demo")
         user_path = self.file_paths.get("custom_user")
 
         if not demo_path:
             QMessageBox.warning(self, "警告", "请先选择 Demo 程序")
             return
-
         if not user_path:
             QMessageBox.warning(self, "警告", "请先选择用户程序")
             return
 
-        # 获取checkdata
-        checkdata_content = ""
-        if self.checkdata_tabs.currentIndex() == 0:  # 文件模式
-            if not self.checkdata_content:
+        tab_idx = self.checkdata_tabs.currentIndex()
+        cleanup_fn = None
+
+        if tab_idx == 0:  # 预设
+            name = self.checkdata_preset_combo.currentText()
+            if not name:
+                QMessageBox.warning(self, "警告", "预设 Checkdata 列表为空")
+                return
+            checkdata_path = str(CHECKDATA_DIR / f"{name}.txt")
+        elif tab_idx == 1:  # 文件
+            checkdata_path = self.file_paths.get("checkdata")
+            if not checkdata_path:
                 QMessageBox.warning(self, "警告", "请先选择 Checkdata 文件")
                 return
-            checkdata_content = self.checkdata_content
-        else:  # 在线构造模式
-            checkdata_content = self.get_online_checkdata()
-            if not checkdata_content.strip():
+        else:  # 在线构造
+            content = self.get_online_checkdata()
+            if not content.strip():
                 QMessageBox.warning(self, "警告", "请添加至少一个检查点")
                 return
+            fd, checkdata_path = tempfile.mkstemp(suffix=".txt")
+            os.close(fd)
+            with open(checkdata_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            cleanup_fn = lambda: os.path.exists(checkdata_path) and os.unlink(checkdata_path)
 
-        self.output_status.setText("运行中...")
-        self.output_status.setStyleSheet("color: #2563EB;")
-        self.output_start_btn.setEnabled(False)
+        tools = self._get_tools()
+        if tools is None:
+            if cleanup_fn:
+                cleanup_fn()
+            return
+        gid_exe, tc_exe = tools
 
-        # 清除之前的结果
-        while self.output_results_container.count():
-            child = self.output_results_container.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
-
-        try:
-            results = run_custom_comparison(demo_path, user_path, checkdata_content)
-
-            passed = sum(1 for r in results if r.status == "PASS")
-            failed = len(results) - passed
-
-            # 显示摘要
-            summary = QLabel(f"完成: {passed}/{len(results)} 通过" + (" ✓" if failed == 0 else " ✗"))
-            summary.setStyleSheet(f"color: {'#22C55E' if failed == 0 else '#EF4444'}; font-size: 14px; font-weight: bold;")
-            self.output_results_container.addWidget(summary)
-
-            # 显示结果卡片
-            for result in results:
-                card = ResultCard(result)
-                self.output_results_container.addWidget(card)
-
-            self.output_status.setText(f"完成: {passed}/{len(results)} 通过, {failed} 失败")
-            self.output_status.setStyleSheet(f"color: {'#22C55E' if failed == 0 else '#EF4444'};")
-
-        except Exception as e:
-            error_label = QLabel(f"错误: {str(e)}")
-            error_label.setStyleSheet(f"color: {COLOR_ERROR};")
-            self.output_results_container.addWidget(error_label)
-            self.output_status.setText(f"错误: {str(e)}")
+        case_ids = parse_data_file(checkdata_path)
+        if not case_ids:
+            self.output_status.setText("Checkdata 文件中没有找到测试用例")
             self.output_status.setStyleSheet(f"color: {COLOR_ERROR};")
-        finally:
-            self.output_start_btn.setEnabled(True)
+            if cleanup_fn:
+                cleanup_fn()
+            return
+
+        def work():
+            raw = run_external_comparison(
+                data_file=checkdata_path,
+                case_ids=case_ids,
+                user_exe=user_path,
+                gid_exe=gid_exe,
+                tc_exe=tc_exe,
+                demo_exe=demo_path,
+            )
+            return raw, len(case_ids)
+
+        self._start_test(work, cleanup_fn)
 
 
 class CheckpointEntry(QWidget):
