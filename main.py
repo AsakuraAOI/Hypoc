@@ -5,7 +5,152 @@ Hypoc - 程序测试与验证系统
 """
 
 import sys
+import re
 from pathlib import Path
+from typing import Dict, Any
+
+# ANSI color code to HTML color mapping
+ANSI_COLORS = {
+    30: "#1A1A1A",   # black
+    31: "#EF4444",   # red
+    32: "#22C55E",   # green
+    33: "#F59E0B",   # yellow
+    34: "#3B82F6",   # blue
+    35: "#A855F7",   # magenta
+    36: "#06B6D4",   # cyan
+    37: "#FFFFFF",   # white
+    90: "#666666",   # bright black (gray)
+    91: "#F87171",   # bright red
+    92: "#4ADE80",   # bright green
+    93: "#FACC15",   # bright yellow
+    94: "#60A5FA",   # bright blue
+    95: "#C084FC",   # bright magenta
+    96: "#22D3EE",   # bright cyan
+    97: "#FFFFFF",   # bright white
+}
+
+
+def ansi_to_html(text: str) -> str:
+    """
+    Convert txt_compare plain-text output to styled HTML.
+    txt_compare uses Windows Console API for colors, so we parse its
+    text output and render it with matching colors ourselves.
+
+    Color coding (from txt_compare footnotes):
+    - <CR> = cyan, <LF>/<CRLF> = green, <EOF> = red
+    - <VT>/<BS>/<BEL> = yellow/magenta
+    - Different position chars = red
+    """
+    if not text:
+        return ""
+
+    # Marker colors per txt_compare footnotes
+    marker_colors = {
+        'CR': "#06B6D4",    # cyan
+        'LF': "#22C55E",    # green
+        'CRLF': "#22C55E",  # green
+        'EOF': "#EF4444",   # red
+        'VT': "#A855F7",    # magenta
+        'BS': "#F59E0B",    # yellow
+        'BEL': "#F59E0B",   # yellow
+    }
+
+    def escape(t):
+        return (t
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\n", "<br/>")
+                .replace("\r", "")
+                .replace("\t", "&nbsp;&nbsp;&nbsp;&nbsp;"))
+
+    # Step 1: Parse diff info - find character position of first difference
+    # Format: [N/M] 从第[K]个字符开始进行比较
+    diff_pos = None
+    diff_match = re.search(r'第\[(\d+)\]个字符开始', text)
+    if diff_match:
+        diff_pos = int(diff_match.group(1))  # 1-indexed position
+
+    # Step 2: Parse file content lines and highlight diff chars
+    # Format: 文件N : content<CR><LF>
+    # We need to color the diff character in the content part
+    def color_file_line(line: str, diff_char_pos: int) -> str:
+        """Highlight the differing character in a file line."""
+        line = line.rstrip('\r')
+        # Try to extract content between " : " and marker
+        m = re.match(r'(文件\d+ : )(.*?)((?:<CR>|<LF>|<CRLF>)*)$', line)
+        if not m:
+            return escape(line)
+
+        prefix = m.group(1)
+        content = m.group(2)
+        suffix = m.group(3)
+
+        # diff_char_pos is 1-indexed, content is 0-indexed
+        idx = diff_char_pos - 1
+        if 0 <= idx < len(content):
+            before = content[:idx]
+            diff_char = content[idx]
+            after = content[idx + 1:]
+            return (
+                escape(prefix)
+                + escape(before)
+                + f'<span style="background-color: #EF4444; color: white; font-weight: bold;">{escape(diff_char)}</span>'
+                + escape(after)
+                + color_markers(suffix)
+            )
+        return escape(prefix) + escape(content) + color_markers(suffix)
+
+    def color_markers(s: str) -> str:
+        """Color <CR>, <LF>, etc."""
+        result = []
+        last_end = 0
+        for m in re.finditer(r'<(CR|LF|CRLF|EOF|VT|BS|BEL)([^>]*)>', s):
+            result.append(escape(s[last_end:m.start()]))
+            marker = m.group(1)
+            extra = m.group(2) or ""
+            # Check if there's a color indicator like (red) after the marker name
+            color = marker_colors.get(marker, "#F59E0B")
+            if '(' in extra:
+                color = "#EF4444"  # red for diff markers
+            result.append(f'<span style="color: {color}; font-weight: bold;">&lt;{marker}{extra}&gt;</span>')
+            last_end = m.end()
+        result.append(escape(s[last_end:]))
+        return "".join(result)
+
+    # Step 3: Process the full text, applying per-line coloring
+    result = []
+    # Find the character position for diff highlighting
+    diff_pos = None
+    diff_match = re.search(r'第\[(\d+)\]个字符开始', text)
+    if diff_match:
+        diff_pos = int(diff_match.group(1))
+
+    for line in text.split('\n'):
+        # Check if this is a file content line
+        if diff_pos is not None and re.match(r'文件\d+ : ', line):
+            result.append(color_file_line(line, diff_pos))
+        else:
+            # Process markers in other lines too
+            if re.search(r'<(CR|LF|CRLF|EOF|VT|BS|BEL)([^>]*)>', line):
+                result.append(color_markers(line))
+            else:
+                result.append(escape(line))
+        result.append('<br/>')
+
+    return "".join(result)
+
+
+def _escape_html(text: str) -> str:
+    """Escape HTML special characters."""
+    return (text
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\n", "<br/>")
+            .replace("\r", "")
+            .replace("\t", "&nbsp;&nbsp;&nbsp;&nbsp;"))
+
 
 # PyQt6 imports
 from PyQt6.QtWidgets import (
@@ -158,7 +303,25 @@ class HypocWindow(QMainWindow):
 
     def setup_window(self):
         self.setWindowTitle("Hypoc")
-        self.setMinimumSize(1000, 700)
+
+        # 动态设置窗口大小，根据屏幕可用区域调整
+        screen = QApplication.primaryScreen()
+        if screen:
+            screen_geo = screen.availableGeometry()
+            # 窗口占屏幕的85%，最大不超过屏幕尺寸，最小保证可读性
+            win_width = min(int(screen_geo.width() * 0.85), 1400)
+            win_height = min(int(screen_geo.height() * 0.85), 900)
+            # 小屏幕笔记本上保证最小可用尺寸
+            win_width = max(win_width, 800)
+            win_height = max(win_height, 600)
+            self.resize(win_width, win_height)
+            # 窗口居中
+            self.move(
+                screen_geo.left() + (screen_geo.width() - win_width) // 2,
+                screen_geo.top() + (screen_geo.height() - win_height) // 2
+            )
+        else:
+            self.setMinimumSize(1000, 700)
 
         # Remove default window border
         self.setStyleSheet("QMainWindow { border: none; }")
@@ -426,6 +589,18 @@ class HypocWindow(QMainWindow):
             save_tools_config(base_dir, gid, tc)
             QMessageBox.information(self, "已保存", "工具路径已保存，可以开始测试了。")
 
+    def _get_tc_params(self) -> Dict[str, Any]:
+        """收集用户选择的 txt_compare 参数"""
+        return {
+            "trim": self.tc_trim_combo.currentText(),
+            "lineskip": self.tc_lineskip_spin.value(),
+            "lineoffset": self.tc_lineoffset_spin.value(),
+            "ignore_blank": self.tc_ignore_blank_cb.isChecked(),
+            "ignore_linefeed": self.tc_ignore_linefeed_cb.isChecked(),
+            "max_diff": self.tc_max_diff_spin.value(),
+            "max_line": self.tc_max_line_spin.value(),
+        }
+
     def _get_tools(self):
         """获取工具路径，找不到时弹出配置对话框。返回 (gid, tc) 或 None（用户取消）"""
         from core.ext_comparison import locate_tools, save_tools_config
@@ -479,10 +654,11 @@ class HypocWindow(QMainWindow):
     def _on_test_done(self, raw, count):
         result_edit = QTextEdit()
         result_edit.setReadOnly(True)
-        result_edit.setPlainText(raw)
+        result_edit.setHtml(ansi_to_html(raw))
         result_edit.setStyleSheet(
-            "background: #FAFAFA; border: none; "
-            "font-family: monospace; font-size: 12px; color: #1A1A1A;"
+            "background: #1E1E1E; border: none; "
+            "font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 12px; "
+            "color: #D4D4D4; padding: 8px;"
         )
         self.output_results_container.addWidget(result_edit)
         self.output_status.setText(f"完成 ({count} 组)")
@@ -556,6 +732,7 @@ class HypocWindow(QMainWindow):
                 gid_exe=gid_exe,
                 tc_exe=tc_exe,
                 expected_hex_map=expected_hex_map,
+                tc_params=self._get_tc_params(),
             )
             return raw, len(case_ids)
 
@@ -625,6 +802,7 @@ class HypocWindow(QMainWindow):
                 gid_exe=gid_exe,
                 tc_exe=tc_exe,
                 demo_exe=demo_path,
+                tc_params=self._get_tc_params(),
             )
             return raw, len(case_ids)
 

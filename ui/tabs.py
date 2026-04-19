@@ -9,7 +9,8 @@ from typing import List, Tuple, Optional, Dict, Any
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QComboBox, QTextEdit, QScrollArea, QFileDialog, QMessageBox,
-    QFrame, QTabWidget, QSizePolicy
+    QFrame, QTabWidget, QSizePolicy, QSpinBox, QCheckBox,
+    QGroupBox, QGridLayout
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QColor, QPalette
@@ -58,6 +59,186 @@ def create_output_check_tab(window) -> QWidget:
                                 "border-radius: 6px; padding: 8px;")
     left_layout.addWidget(output_desc)
 
+    # 比对参数区域（置于开始测试按钮下方）
+    tc_group = QGroupBox("比对参数（txt_compare）")
+    tc_group.setStyleSheet("""
+        QGroupBox {
+            font-size: 12px;
+            font-weight: bold;
+            color: #666666;
+            border: 1px solid #E0E0E0;
+            border-radius: 6px;
+            margin-top: 4px;
+            padding-top: 8px;
+        }
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            left: 8px;
+            padding: 0 4px;
+        }
+    """)
+    tc_grid = QGridLayout(tc_group)
+    tc_grid.setSpacing(8)
+
+    # --trim
+    trim_label = QLabel("--trim")
+    trim_label.setStyleSheet("color: #666666; font-size: 11px;")
+    window.tc_trim_combo = QComboBox()
+    window.tc_trim_combo.addItems(["none", "left", "right", "all"])
+    window.tc_trim_combo.setCurrentText("none")
+    window.tc_trim_combo.setStyleSheet("""
+        QComboBox {
+            background: #FFFFFF;
+            border: 1px solid #E0E0E0;
+            border-radius: 4px;
+            padding: 4px 8px;
+            color: #1A1A1A;
+            font-size: 11px;
+        }
+        QComboBox::drop-down { border: none; }
+        QComboBox QAbstractItemView {
+            background: #FFFFFF;
+            border: 1px solid #E0E0E0;
+            color: #1A1A1A;
+            font-size: 11px;
+        }
+    """)
+    tc_grid.addWidget(trim_label, 0, 0)
+    tc_grid.addWidget(window.tc_trim_combo, 0, 1)
+
+    # --lineskip
+    lineskip_label = QLabel("--lineskip")
+    lineskip_label.setStyleSheet("color: #666666; font-size: 11px;")
+    window.tc_lineskip_spin = QSpinBox()
+    window.tc_lineskip_spin.setRange(0, 100)
+    window.tc_lineskip_spin.setValue(0)
+    window.tc_lineskip_spin.setStyleSheet("""
+        QSpinBox {
+            background: #FFFFFF;
+            border: 1px solid #E0E0E0;
+            border-radius: 4px;
+            padding: 4px 8px;
+            color: #1A1A1A;
+            font-size: 11px;
+        }
+    """)
+    tc_grid.addWidget(lineskip_label, 0, 2)
+    tc_grid.addWidget(window.tc_lineskip_spin, 0, 3)
+
+    # --lineoffset
+    lineoffset_label = QLabel("--lineoffset")
+    lineoffset_label.setStyleSheet("color: #666666; font-size: 11px;")
+    window.tc_lineoffset_spin = QSpinBox()
+    window.tc_lineoffset_spin.setRange(-100, 100)
+    window.tc_lineoffset_spin.setValue(0)
+    window.tc_lineoffset_spin.setStyleSheet("""
+        QSpinBox {
+            background: #FFFFFF;
+            border: 1px solid #E0E0E0;
+            border-radius: 4px;
+            padding: 4px 8px;
+            color: #1A1A1A;
+            font-size: 11px;
+        }
+    """)
+    tc_grid.addWidget(lineoffset_label, 1, 0)
+    tc_grid.addWidget(window.tc_lineoffset_spin, 1, 1)
+
+    # --ignore_blank
+    window.tc_ignore_blank_cb = QCheckBox("--ignore_blank")
+    window.tc_ignore_blank_cb.setStyleSheet("""
+        QCheckBox {
+            color: #666666;
+            font-size: 11px;
+        }
+        QCheckBox::indicator {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            border: 1px solid #CCCCCC;
+            background: white;
+        }
+        QCheckBox::indicator:checked {
+            background: #2563EB;
+            border: 1px solid #2563EB;
+        }
+    """)
+    tc_grid.addWidget(window.tc_ignore_blank_cb, 1, 2, 1, 2)
+
+    # --ignore_linefeed
+    window.tc_ignore_linefeed_cb = QCheckBox("--ignore_linefeed")
+    window.tc_ignore_linefeed_cb.setStyleSheet("""
+        QCheckBox {
+            color: #666666;
+            font-size: 11px;
+        }
+        QCheckBox::indicator {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            border: 1px solid #CCCCCC;
+            background: white;
+        }
+        QCheckBox::indicator:checked {
+            background: #2563EB;
+            border: 1px solid #2563EB;
+        }
+    """)
+    tc_grid.addWidget(window.tc_ignore_linefeed_cb, 2, 0, 1, 2)
+
+    # --max_diff
+    max_diff_label = QLabel("--max_diff")
+    max_diff_label.setStyleSheet("color: #666666; font-size: 11px;")
+    window.tc_max_diff_spin = QSpinBox()
+    window.tc_max_diff_spin.setRange(0, 100)
+    window.tc_max_diff_spin.setValue(0)
+    window.tc_max_diff_spin.setStyleSheet("""
+        QSpinBox {
+            background: #FFFFFF;
+            border: 1px solid #E0E0E0;
+            border-radius: 4px;
+            padding: 4px 8px;
+            color: #1A1A1A;
+            font-size: 11px;
+        }
+    """)
+    tc_grid.addWidget(max_diff_label, 2, 2)
+    tc_grid.addWidget(window.tc_max_diff_spin, 2, 3)
+
+    # --max_line
+    max_line_label = QLabel("--max_line")
+    max_line_label.setStyleSheet("color: #666666; font-size: 11px;")
+    window.tc_max_line_spin = QSpinBox()
+    window.tc_max_line_spin.setRange(0, 10000)
+    window.tc_max_line_spin.setValue(0)
+    window.tc_max_line_spin.setStyleSheet("""
+        QSpinBox {
+            background: #FFFFFF;
+            border: 1px solid #E0E0E0;
+            border-radius: 4px;
+            padding: 4px 8px;
+            color: #1A1A1A;
+            font-size: 11px;
+        }
+    """)
+    tc_grid.addWidget(max_line_label, 3, 0)
+    tc_grid.addWidget(window.tc_max_line_spin, 3, 1)
+
+    # 开始测试按钮
+    window.output_start_btn = QPushButton("开始测试")
+    window.output_start_btn.setStyleSheet("""
+        QPushButton {
+            background-color: #2563EB;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        QPushButton:hover { background-color: #1D4ED8; }
+    """)
+    window.output_start_btn.clicked.connect(window.run_output_test)
     # 预设/自定义 子Tab
     window.output_sub_tabs = QTabWidget()
     window.output_sub_tabs.setStyleSheet("""
@@ -378,6 +559,9 @@ def create_output_check_tab(window) -> QWidget:
     """)
     window.configure_tools_btn.clicked.connect(window.open_tools_config)
     left_layout.addWidget(window.configure_tools_btn)
+
+    # 比对参数（置于问题选择下方）
+    left_layout.addWidget(tc_group)
 
     # 状态
     window.output_status = QLabel("")

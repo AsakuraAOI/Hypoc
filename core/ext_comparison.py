@@ -8,7 +8,7 @@ import tempfile
 import os
 import subprocess
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 
 
 def locate_tools(base_dir: str) -> tuple:
@@ -83,6 +83,31 @@ def group_case_ids(case_ids: List[str]) -> Dict[str, List[str]]:
     return groups
 
 
+def _build_tc_args(tc_params: Optional[Dict[str, Any]]) -> List[str]:
+    """根据用户选择的 txt_compare 参数构建命令行列表"""
+    if not tc_params:
+        return []
+    args = []
+    p = tc_params
+
+    if p.get("trim") and p["trim"] != "none":
+        args += ['--trim', p["trim"]]
+    if p.get("lineskip", 0) > 0:
+        args += ['--lineskip', str(p["lineskip"])]
+    if p.get("lineoffset", 0) != 0:
+        args += ['--lineoffset', str(p["lineoffset"])]
+    if p.get("ignore_blank"):
+        args.append('--ignore_blank')
+    if p.get("ignore_linefeed"):
+        args.append('--ignore_linefeed')
+    if p.get("max_diff", 0) > 0:
+        args += ['--max_diff', str(p["max_diff"])]
+    if p.get("max_line", 0) > 0:
+        args += ['--max_line', str(p["max_line"])]
+
+    return args
+
+
 def run_case_via_pipe(gid_exe: str, data_file: str, case_id: str,
                       target_exe: str, timeout: int = 10) -> bytes:
     """
@@ -121,6 +146,7 @@ def run_external_comparison(
     tc_exe: str,
     demo_output_file: Optional[str] = None,
     demo_exe: Optional[str] = None,
+    tc_params: Optional[Dict[str, Any]] = None,
 ) -> str:
     """
     运行所有 case，对比，返回 txt_compare 的 stdout 文本。
@@ -152,11 +178,13 @@ def run_external_comparison(
                     out = run_case_via_pipe(gid_exe, data_file, cid, demo_exe)
                     exp_f.write(out)
 
+        tc_args = _build_tc_args(tc_params)
         result = subprocess.run(
             [tc_exe,
              '--file1', actual_path,
              '--file2', expected_path,
-             '--display', 'detailed'],
+             '--display', 'detailed']
+            + tc_args,
             capture_output=True, timeout=30
         )
         output = result.stdout.decode('gbk', errors='replace')
@@ -177,6 +205,7 @@ def run_preset_external_comparison(
     gid_exe: str,
     tc_exe: str,
     expected_hex_map: Dict[str, str],  # {case_id: output_hex}
+    tc_params: Optional[Dict[str, Any]] = None,
 ) -> str:
     """
     预设模式：期望输出从 JSON 的 output_hex 还原，实际输出通过 get_input_data | user_exe 生成。
@@ -197,11 +226,13 @@ def run_preset_external_comparison(
                 if hex_str:
                     exp_f.write(bytes.fromhex(hex_str))
 
+        tc_args = _build_tc_args(tc_params)
         result = subprocess.run(
             [tc_exe,
              '--file1', actual_path,
              '--file2', expected_path,
-             '--display', 'detailed'],
+             '--display', 'detailed']
+            + tc_args,
             capture_output=True, timeout=30
         )
         output = result.stdout.decode('gbk', errors='replace')
