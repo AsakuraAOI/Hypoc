@@ -45,6 +45,11 @@ def build():
         print("输出目录: dist/main.dist/")
         print("运行方式: dist/main.dist/main.exe")
         print("注意: data 目录已复制到 dist/main.dist/data")
+        print()
+        print("【首次使用前需配置外部工具】")
+        print("  启动后点击「配置工具」按钮，分别指定：")
+        print("  - get_input_data.exe")
+        print("  - txt_compare.exe")
     else:
         print(f"\n打包失败: {result.returncode}")
 
