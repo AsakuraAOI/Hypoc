@@ -109,7 +109,7 @@ def _build_tc_args(tc_params: Optional[Dict[str, Any]]) -> List[str]:
 
 
 def run_case_via_pipe(gid_exe: str, data_file: str, case_id: str,
-                      target_exe: str, timeout: int = 10) -> bytes:
+                      target_exe: str, timeout: int = 120) -> bytes:
     """
     两步法：先用 get_input_data 提取输入字节，再作为 stdin 传给 target_exe。
     避免 Windows 上 Popen 管道 EOF 不可靠的问题。
@@ -185,7 +185,7 @@ def run_external_comparison(
              '--file2', expected_path,
              '--display', 'detailed']
             + tc_args,
-            capture_output=True, timeout=30
+            capture_output=True, timeout=120
         )
         output = result.stdout.decode('gbk', errors='replace')
         if result.stderr:
@@ -233,7 +233,7 @@ def run_preset_external_comparison(
              '--file2', expected_path,
              '--display', 'detailed']
             + tc_args,
-            capture_output=True, timeout=30
+            capture_output=True, timeout=120
         )
         output = result.stdout.decode('gbk', errors='replace')
         if result.stderr:
