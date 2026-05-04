@@ -26,17 +26,18 @@ PROBLEMS = [
     "6-b1", "6-b2", "6-b3",
 ]
 
-# Theme colors - Clean light theme
-COLOR_TEXT_PRIMARY = "#1A1A1A"
-COLOR_TEXT_SECONDARY = "#666666"
-COLOR_ACCENT = "#2563EB"
-COLOR_ACCENT_HOVER = "#1D4ED8"
-COLOR_SUCCESS = "#22C55E"
-COLOR_ERROR = "#EF4444"
-COLOR_WARNING = "#F59E0B"
-COLOR_CRITICAL = "#DC2626"
-COLOR_BG_CARD = "#FFFFFF"
-COLOR_BORDER = "#E0E0E0"
+# Theme colors — VS Code-style dark
+COLOR_TEXT_PRIMARY = "#D4D4D4"
+COLOR_TEXT_SECONDARY = "#999999"
+COLOR_ACCENT = "#0078D4"
+COLOR_ACCENT_HOVER = "#1A8CDC"
+COLOR_SUCCESS = "#4ADE80"
+COLOR_ERROR = "#F87171"
+COLOR_WARNING = "#FBBF24"
+COLOR_CRITICAL = "#EF4444"
+COLOR_BG_CARD = "#252526"
+COLOR_BORDER = "#3E3E3E"
+COLOR_BG_LIGHT = "#1E1E1E"
 
 
 def create_output_check_tab(window) -> QWidget:
@@ -50,23 +51,14 @@ def create_output_check_tab(window) -> QWidget:
     left_layout = QVBoxLayout(left_panel)
     left_layout.setSpacing(12)
 
-    # 输出检查说明
-    output_desc = QLabel(
-        "使用 get_input_data + txt_compare 外部工具链进行比对，复现真实测试环境。"
-    )
-    output_desc.setWordWrap(True)
-    output_desc.setStyleSheet("color: #666666; font-size: 11px; background: #F0F7FF; "
-                                "border-radius: 6px; padding: 8px;")
-    left_layout.addWidget(output_desc)
-
     # 比对参数区域（置于开始测试按钮下方）
     tc_group = QGroupBox("比对参数（txt_compare）")
     tc_group.setStyleSheet("""
         QGroupBox {
             font-size: 12px;
             font-weight: bold;
-            color: #666666;
-            border: 1px solid #E0E0E0;
+            color: #999999;
+            border: 1px solid #3E3E3E;
             border-radius: 6px;
             margin-top: 4px;
             padding-top: 8px;
@@ -82,24 +74,24 @@ def create_output_check_tab(window) -> QWidget:
 
     # --trim
     trim_label = QLabel("--trim")
-    trim_label.setStyleSheet("color: #666666; font-size: 11px;")
+    trim_label.setStyleSheet("color: #999999; font-size: 11px;")
     window.tc_trim_combo = QComboBox()
     window.tc_trim_combo.addItems(["none", "left", "right", "all"])
     window.tc_trim_combo.setCurrentText("none")
     window.tc_trim_combo.setStyleSheet("""
         QComboBox {
-            background: #FFFFFF;
-            border: 1px solid #E0E0E0;
+            background: #2D2D2D;
+            border: 1px solid #3E3E3E;
             border-radius: 4px;
             padding: 4px 8px;
-            color: #1A1A1A;
+            color: #D4D4D4;
             font-size: 11px;
         }
         QComboBox::drop-down { border: none; }
         QComboBox QAbstractItemView {
-            background: #FFFFFF;
-            border: 1px solid #E0E0E0;
-            color: #1A1A1A;
+            background: #2D2D2D;
+            border: 1px solid #3E3E3E;
+            color: #D4D4D4;
             font-size: 11px;
         }
     """)
@@ -108,17 +100,17 @@ def create_output_check_tab(window) -> QWidget:
 
     # --lineskip
     lineskip_label = QLabel("--lineskip")
-    lineskip_label.setStyleSheet("color: #666666; font-size: 11px;")
+    lineskip_label.setStyleSheet("color: #999999; font-size: 11px;")
     window.tc_lineskip_spin = QSpinBox()
     window.tc_lineskip_spin.setRange(0, 100)
     window.tc_lineskip_spin.setValue(0)
     window.tc_lineskip_spin.setStyleSheet("""
         QSpinBox {
-            background: #FFFFFF;
-            border: 1px solid #E0E0E0;
+            background: #2D2D2D;
+            border: 1px solid #3E3E3E;
             border-radius: 4px;
             padding: 4px 8px;
-            color: #1A1A1A;
+            color: #D4D4D4;
             font-size: 11px;
         }
     """)
@@ -127,17 +119,17 @@ def create_output_check_tab(window) -> QWidget:
 
     # --lineoffset
     lineoffset_label = QLabel("--lineoffset")
-    lineoffset_label.setStyleSheet("color: #666666; font-size: 11px;")
+    lineoffset_label.setStyleSheet("color: #999999; font-size: 11px;")
     window.tc_lineoffset_spin = QSpinBox()
     window.tc_lineoffset_spin.setRange(-100, 100)
     window.tc_lineoffset_spin.setValue(0)
     window.tc_lineoffset_spin.setStyleSheet("""
         QSpinBox {
-            background: #FFFFFF;
-            border: 1px solid #E0E0E0;
+            background: #2D2D2D;
+            border: 1px solid #3E3E3E;
             border-radius: 4px;
             padding: 4px 8px;
-            color: #1A1A1A;
+            color: #D4D4D4;
             font-size: 11px;
         }
     """)
@@ -148,19 +140,19 @@ def create_output_check_tab(window) -> QWidget:
     window.tc_ignore_blank_cb = QCheckBox("--ignore_blank")
     window.tc_ignore_blank_cb.setStyleSheet("""
         QCheckBox {
-            color: #666666;
+            color: #999999;
             font-size: 11px;
         }
         QCheckBox::indicator {
             width: 14px;
             height: 14px;
             border-radius: 3px;
-            border: 1px solid #CCCCCC;
-            background: white;
+            border: 1px solid #3E3E3E;
+            background: #2D2D2D;
         }
         QCheckBox::indicator:checked {
-            background: #2563EB;
-            border: 1px solid #2563EB;
+            background: #0078D4;
+            border: 1px solid #0078D4;
         }
     """)
     tc_grid.addWidget(window.tc_ignore_blank_cb, 1, 2, 1, 2)
@@ -169,36 +161,36 @@ def create_output_check_tab(window) -> QWidget:
     window.tc_ignore_linefeed_cb = QCheckBox("--ignore_linefeed")
     window.tc_ignore_linefeed_cb.setStyleSheet("""
         QCheckBox {
-            color: #666666;
+            color: #999999;
             font-size: 11px;
         }
         QCheckBox::indicator {
             width: 14px;
             height: 14px;
             border-radius: 3px;
-            border: 1px solid #CCCCCC;
-            background: white;
+            border: 1px solid #3E3E3E;
+            background: #2D2D2D;
         }
         QCheckBox::indicator:checked {
-            background: #2563EB;
-            border: 1px solid #2563EB;
+            background: #0078D4;
+            border: 1px solid #0078D4;
         }
     """)
     tc_grid.addWidget(window.tc_ignore_linefeed_cb, 2, 0, 1, 2)
 
     # --max_diff
     max_diff_label = QLabel("--max_diff")
-    max_diff_label.setStyleSheet("color: #666666; font-size: 11px;")
+    max_diff_label.setStyleSheet("color: #999999; font-size: 11px;")
     window.tc_max_diff_spin = QSpinBox()
     window.tc_max_diff_spin.setRange(0, 100)
     window.tc_max_diff_spin.setValue(0)
     window.tc_max_diff_spin.setStyleSheet("""
         QSpinBox {
-            background: #FFFFFF;
-            border: 1px solid #E0E0E0;
+            background: #2D2D2D;
+            border: 1px solid #3E3E3E;
             border-radius: 4px;
             padding: 4px 8px;
-            color: #1A1A1A;
+            color: #D4D4D4;
             font-size: 11px;
         }
     """)
@@ -207,38 +199,23 @@ def create_output_check_tab(window) -> QWidget:
 
     # --max_line
     max_line_label = QLabel("--max_line")
-    max_line_label.setStyleSheet("color: #666666; font-size: 11px;")
+    max_line_label.setStyleSheet("color: #999999; font-size: 11px;")
     window.tc_max_line_spin = QSpinBox()
     window.tc_max_line_spin.setRange(0, 10000)
     window.tc_max_line_spin.setValue(0)
     window.tc_max_line_spin.setStyleSheet("""
         QSpinBox {
-            background: #FFFFFF;
-            border: 1px solid #E0E0E0;
+            background: #2D2D2D;
+            border: 1px solid #3E3E3E;
             border-radius: 4px;
             padding: 4px 8px;
-            color: #1A1A1A;
+            color: #D4D4D4;
             font-size: 11px;
         }
     """)
     tc_grid.addWidget(max_line_label, 3, 0)
     tc_grid.addWidget(window.tc_max_line_spin, 3, 1)
 
-    # 开始测试按钮
-    window.output_start_btn = QPushButton("开始测试")
-    window.output_start_btn.setStyleSheet("""
-        QPushButton {
-            background-color: #2563EB;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 12px;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        QPushButton:hover { background-color: #1D4ED8; }
-    """)
-    window.output_start_btn.clicked.connect(window.run_output_test)
     # 预设/自定义 子Tab
     window.output_sub_tabs = QTabWidget()
     window.output_sub_tabs.setStyleSheet("""
@@ -247,20 +224,20 @@ def create_output_check_tab(window) -> QWidget:
             background: transparent;
         }
         QTabBar::tab {
-            background: #FFFFFF;
-            color: #666666;
+            background: #2D2D2D;
+            color: #999999;
             padding: 8px 20px;
-            border: 1px solid #E0E0E0;
+            border: 1px solid #3E3E3E;
             border-radius: 6px;
             margin-right: 6px;
         }
         QTabBar::tab:selected {
-            background: #2563EB;
+            background: #0078D4;
             color: white;
             font-weight: bold;
         }
         QTabBar::tab:hover:!selected {
-            background: #F5F5F5;
+            background: #333333;
         }
     """)
 
@@ -272,24 +249,24 @@ def create_output_check_tab(window) -> QWidget:
     # EXE选择
     exe_layout = QVBoxLayout()
     exe_label = QLabel("程序文件")
-    exe_label.setStyleSheet("color: #666666; font-size: 12px;")
+    exe_label.setStyleSheet("color: #999999; font-size: 12px;")
     exe_layout.addWidget(exe_label)
 
     exe_btn_layout = QHBoxLayout()
     window.preset_exe_btn = QPushButton("选择EXE")
     window.preset_exe_btn.setStyleSheet("""
         QPushButton {
-            background-color: #2563EB;
+            background-color: #0078D4;
             color: white;
             border: none;
             border-radius: 6px;
             padding: 10px 20px;
         }
-        QPushButton:hover { background-color: #1D4ED8; }
+        QPushButton:hover { background-color: #1A8CDC; }
     """)
     window.preset_exe_btn.clicked.connect(lambda: window.select_file("preset_exe", "exe"))
     window.preset_exe_label = QLabel("未选择")
-    window.preset_exe_label.setStyleSheet("color: #666666; font-size: 12px;")
+    window.preset_exe_label.setStyleSheet("color: #999999; font-size: 12px;")
     exe_btn_layout.addWidget(window.preset_exe_btn)
     exe_btn_layout.addWidget(window.preset_exe_label)
     exe_btn_layout.addStretch()
@@ -299,26 +276,26 @@ def create_output_check_tab(window) -> QWidget:
     # 问题选择
     problem_layout = QVBoxLayout()
     problem_label = QLabel("问题")
-    problem_label.setStyleSheet("color: #666666; font-size: 12px;")
+    problem_label.setStyleSheet("color: #999999; font-size: 12px;")
     problem_layout.addWidget(problem_label)
 
     window.preset_problem_combo = QComboBox()
     window.preset_problem_combo.addItems(PROBLEMS)
     window.preset_problem_combo.setStyleSheet("""
         QComboBox {
-            background: #FFFFFF;
-            border: 1px solid #E0E0E0;
+            background: #2D2D2D;
+            border: 1px solid #3E3E3E;
             border-radius: 6px;
             padding: 10px;
-            color: #1A1A1A;
+            color: #D4D4D4;
         }
         QComboBox::drop-down {
             border: none;
         }
         QComboBox QAbstractItemView {
-            background: #FFFFFF;
-            border: 1px solid #E0E0E0;
-            color: #1A1A1A;
+            background: #2D2D2D;
+            border: 1px solid #3E3E3E;
+            color: #D4D4D4;
         }
     """)
     problem_layout.addWidget(window.preset_problem_combo)
@@ -336,24 +313,24 @@ def create_output_check_tab(window) -> QWidget:
     # Demo EXE
     demo_layout = QVBoxLayout()
     demo_label = QLabel("Demo程序")
-    demo_label.setStyleSheet("color: #666666; font-size: 12px;")
+    demo_label.setStyleSheet("color: #999999; font-size: 12px;")
     demo_layout.addWidget(demo_label)
 
     demo_btn_layout = QHBoxLayout()
     window.custom_demo_btn = QPushButton("选择Demo")
     window.custom_demo_btn.setStyleSheet("""
         QPushButton {
-            background-color: #2563EB;
+            background-color: #0078D4;
             color: white;
             border: none;
             border-radius: 6px;
             padding: 10px 20px;
         }
-        QPushButton:hover { background-color: #1D4ED8; }
+        QPushButton:hover { background-color: #1A8CDC; }
     """)
     window.custom_demo_btn.clicked.connect(lambda: window.select_file("custom_demo", "exe"))
     window.custom_demo_label = QLabel("未选择")
-    window.custom_demo_label.setStyleSheet("color: #666666; font-size: 12px;")
+    window.custom_demo_label.setStyleSheet("color: #999999; font-size: 12px;")
     demo_btn_layout.addWidget(window.custom_demo_btn)
     demo_btn_layout.addWidget(window.custom_demo_label)
     demo_btn_layout.addStretch()
@@ -363,24 +340,24 @@ def create_output_check_tab(window) -> QWidget:
     # User EXE
     user_layout = QVBoxLayout()
     user_label = QLabel("用户程序")
-    user_label.setStyleSheet("color: #666666; font-size: 12px;")
+    user_label.setStyleSheet("color: #999999; font-size: 12px;")
     user_layout.addWidget(user_label)
 
     user_btn_layout = QHBoxLayout()
     window.custom_user_btn = QPushButton("选择用户EXE")
     window.custom_user_btn.setStyleSheet("""
         QPushButton {
-            background-color: #2563EB;
+            background-color: #0078D4;
             color: white;
             border: none;
             border-radius: 6px;
             padding: 10px 20px;
         }
-        QPushButton:hover { background-color: #1D4ED8; }
+        QPushButton:hover { background-color: #1A8CDC; }
     """)
     window.custom_user_btn.clicked.connect(lambda: window.select_file("custom_user", "exe"))
     window.custom_user_label = QLabel("未选择")
-    window.custom_user_label.setStyleSheet("color: #666666; font-size: 12px;")
+    window.custom_user_label.setStyleSheet("color: #999999; font-size: 12px;")
     user_btn_layout.addWidget(window.custom_user_btn)
     user_btn_layout.addWidget(window.custom_user_label)
     user_btn_layout.addStretch()
@@ -389,7 +366,7 @@ def create_output_check_tab(window) -> QWidget:
 
     # 测试数据标题
     checkdata_title = QLabel("测试数据")
-    checkdata_title.setStyleSheet("color: #1A1A1A; font-size: 14px; font-weight: bold;")
+    checkdata_title.setStyleSheet("color: #D4D4D4; font-size: 14px; font-weight: bold;")
     custom_layout.addWidget(checkdata_title)
 
     # 预设 / 文件上传 / 在线构造 切换
@@ -400,16 +377,19 @@ def create_output_check_tab(window) -> QWidget:
             background: transparent;
         }
         QTabBar::tab {
-            background: #FFFFFF;
-            color: #666666;
+            background: #2D2D2D;
+            color: #999999;
             padding: 6px 16px;
-            border: 1px solid #E0E0E0;
+            border: 1px solid #3E3E3E;
             border-radius: 4px;
             margin-right: 4px;
         }
         QTabBar::tab:selected {
-            background: #2563EB;
+            background: #0078D4;
             color: white;
+        }
+        QTabBar::tab:hover:!selected {
+            background: #333333;
         }
     """)
 
@@ -421,17 +401,17 @@ def create_output_check_tab(window) -> QWidget:
     window.checkdata_preset_combo = QComboBox()
     window.checkdata_preset_combo.setStyleSheet("""
         QComboBox {
-            background: #FFFFFF;
-            border: 1px solid #E0E0E0;
+            background: #2D2D2D;
+            border: 1px solid #3E3E3E;
             border-radius: 6px;
             padding: 10px;
-            color: #1A1A1A;
+            color: #D4D4D4;
         }
         QComboBox::drop-down { border: none; }
         QComboBox QAbstractItemView {
-            background: #FFFFFF;
-            border: 1px solid #E0E0E0;
-            color: #1A1A1A;
+            background: #2D2D2D;
+            border: 1px solid #3E3E3E;
+            color: #D4D4D4;
         }
     """)
     preset_cd_layout.addWidget(window.checkdata_preset_combo)
@@ -446,19 +426,19 @@ def create_output_check_tab(window) -> QWidget:
     window.checkdata_file_btn = QPushButton("选择Checkdata文件")
     window.checkdata_file_btn.setStyleSheet("""
         QPushButton {
-            background-color: #2563EB;
+            background-color: #0078D4;
             color: white;
             border: none;
             border-radius: 6px;
             padding: 10px 20px;
         }
-        QPushButton:hover { background-color: #1D4ED8; }
+        QPushButton:hover { background-color: #1A8CDC; }
     """)
     window.checkdata_file_btn.clicked.connect(window.select_checkdata_file)
     file_layout.addWidget(window.checkdata_file_btn)
 
     window.checkdata_file_label = QLabel("未选择")
-    window.checkdata_file_label.setStyleSheet("color: #666666; font-size: 12px;")
+    window.checkdata_file_label.setStyleSheet("color: #999999; font-size: 12px;")
     file_layout.addWidget(window.checkdata_file_label)
 
     window.checkdata_tabs.addTab(file_widget, "文件")
@@ -472,13 +452,13 @@ def create_output_check_tab(window) -> QWidget:
     window.add_checkpoint_btn = QPushButton("+ 添加检查点")
     window.add_checkpoint_btn.setStyleSheet("""
         QPushButton {
-            background-color: #2563EB;
+            background-color: #0078D4;
             color: white;
             border: none;
             border-radius: 6px;
             padding: 8px;
         }
-        QPushButton:hover { background-color: #1D4ED8; }
+        QPushButton:hover { background-color: #1A8CDC; }
     """)
     window.add_checkpoint_btn.clicked.connect(window.add_checkpoint)
     online_layout.addWidget(window.add_checkpoint_btn)
@@ -489,17 +469,17 @@ def create_output_check_tab(window) -> QWidget:
     window.checkpoint_scroll.setMinimumHeight(300)
     window.checkpoint_scroll.setStyleSheet("""
         QScrollArea {
-            border: 1px solid #E0E0E0;
+            border: 1px solid #3E3E3E;
             border-radius: 6px;
-            background: white;
+            background: #1E1E1E;
         }
         QScrollBar:vertical {
-            background: #F5F5F5;
+            background: #2D2D2D;
             width: 6px;
             border-radius: 3px;
         }
         QScrollBar::handle {
-            background: #CCCCCC;
+            background: #555555;
             border-radius: 3px;
         }
     """)
@@ -531,7 +511,7 @@ def create_output_check_tab(window) -> QWidget:
     window.output_start_btn = QPushButton("开始测试")
     window.output_start_btn.setStyleSheet("""
         QPushButton {
-            background-color: #2563EB;
+            background-color: #0078D4;
             color: white;
             border: none;
             border-radius: 8px;
@@ -539,7 +519,7 @@ def create_output_check_tab(window) -> QWidget:
             font-size: 14px;
             font-weight: bold;
         }
-        QPushButton:hover { background-color: #1D4ED8; }
+        QPushButton:hover { background-color: #1A8CDC; }
     """)
     window.output_start_btn.clicked.connect(window.run_output_test)
     left_layout.addWidget(window.output_start_btn)
@@ -549,13 +529,13 @@ def create_output_check_tab(window) -> QWidget:
     window.configure_tools_btn.setStyleSheet("""
         QPushButton {
             background-color: transparent;
-            color: #666666;
-            border: 1px solid #E0E0E0;
+            color: #999999;
+            border: 1px solid #3E3E3E;
             border-radius: 8px;
             padding: 8px;
             font-size: 12px;
         }
-        QPushButton:hover { background-color: #F5F5F5; color: #1A1A1A; }
+        QPushButton:hover { background-color: #333333; color: #D4D4D4; }
     """)
     window.configure_tools_btn.clicked.connect(window.open_tools_config)
     left_layout.addWidget(window.configure_tools_btn)
@@ -565,7 +545,7 @@ def create_output_check_tab(window) -> QWidget:
 
     # 状态
     window.output_status = QLabel("")
-    window.output_status.setStyleSheet("color: #666666; font-size: 12px;")
+    window.output_status.setStyleSheet("color: #999999; font-size: 12px;")
     left_layout.addWidget(window.output_status)
 
     layout.addWidget(left_panel, 1)
@@ -575,35 +555,23 @@ def create_output_check_tab(window) -> QWidget:
     results_layout = QVBoxLayout(results_card)
 
     results_title = QLabel("测试结果")
-    results_title.setStyleSheet("color: #1A1A1A; font-size: 16px; font-weight: bold;")
+    results_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    results_title.setStyleSheet("color: #D4D4D4; font-size: 16px; font-weight: bold;")
     results_layout.addWidget(results_title)
 
-    scroll = QScrollArea()
-    scroll.setWidgetResizable(True)
-    scroll.setStyleSheet("""
-        QScrollArea {
-            border: none;
-            background: transparent;
-        }
-        QScrollBar:vertical {
-            background: #F5F5F5;
-            width: 8px;
-            border-radius: 4px;
-        }
-        QScrollBar::handle {
-            background: #CCCCCC;
-            border-radius: 4px;
+    # Terminal 容器 — termqt Terminal widget 动态放入此处
+    window.terminal_container = QWidget()
+    window.terminal_container.setStyleSheet("""
+        QWidget {
+            background-color: #1E1E1E;
+            border: 1px solid #3E3E3E;
+            border-radius: 8px;
         }
     """)
-
-    window.output_results_container = QVBoxLayout()
-    window.output_results_container.setSpacing(8)
-
-    results_widget = QWidget()
-    results_widget.setLayout(window.output_results_container)
-    scroll.setWidget(results_widget)
-
-    results_layout.addWidget(scroll)
+    window.terminal_layout = QVBoxLayout(window.terminal_container)
+    window.terminal_layout.setContentsMargins(2, 2, 2, 2)
+    window.terminal_layout.setSpacing(0)
+    results_layout.addWidget(window.terminal_container, 1)
 
     layout.addWidget(results_card, 2)
 
@@ -622,7 +590,7 @@ def create_source_check_tab(window) -> QWidget:
     left_layout.setSpacing(12)
 
     left_title = QLabel("源码检查")
-    left_title.setStyleSheet("color: #1A1A1A; font-size: 14px; font-weight: bold;")
+    left_title.setStyleSheet("color: #D4D4D4; font-size: 14px; font-weight: bold;")
     left_layout.addWidget(left_title)
 
     # 源码上传
@@ -631,17 +599,17 @@ def create_source_check_tab(window) -> QWidget:
     window.source_btn = QPushButton("选择源码文件")
     window.source_btn.setStyleSheet("""
         QPushButton {
-            background-color: #2563EB;
+            background-color: #0078D4;
             color: white;
             border: none;
             border-radius: 6px;
             padding: 10px 20px;
         }
-        QPushButton:hover { background-color: #1D4ED8; }
+        QPushButton:hover { background-color: #1A8CDC; }
     """)
     window.source_btn.clicked.connect(window.select_source_file)
     window.source_label = QLabel("未选择")
-    window.source_label.setStyleSheet("color: #666666; font-size: 12px;")
+    window.source_label.setStyleSheet("color: #999999; font-size: 12px;")
     source_btn_layout.addWidget(window.source_btn)
     source_btn_layout.addWidget(window.source_label)
     source_btn_layout.addStretch()
@@ -658,7 +626,7 @@ def create_source_check_tab(window) -> QWidget:
     right_layout.setSpacing(12)
 
     right_title = QLabel("检查结果")
-    right_title.setStyleSheet("color: #1A1A1A; font-size: 14px; font-weight: bold;")
+    right_title.setStyleSheet("color: #D4D4D4; font-size: 14px; font-weight: bold;")
     right_layout.addWidget(right_title)
 
     # 格式检查
@@ -666,21 +634,21 @@ def create_source_check_tab(window) -> QWidget:
     style_layout.setSpacing(8)
 
     style_title = QLabel("格式检查")
-    style_title.setStyleSheet("color: #1A1A1A; font-size: 13px; font-weight: 600;")
+    style_title.setStyleSheet("color: #D4D4D4; font-size: 13px; font-weight: 600;")
     style_layout.addWidget(style_title)
 
     window.style_status = QLabel("未检查")
-    window.style_status.setStyleSheet("color: #666666; font-size: 12px;")
+    window.style_status.setStyleSheet("color: #999999; font-size: 12px;")
     style_layout.addWidget(window.style_status)
 
     window.style_result = QTextEdit()
     window.style_result.setReadOnly(True)
     window.style_result.setStyleSheet("""
-        background-color: #FAFAFA;
+        background-color: #2D2D2D;
         border: none;
         border-radius: 6px;
         padding: 8px;
-        color: #1A1A1A;
+        color: #D4D4D4;
         font-size: 12px;
     """)
     style_layout.addWidget(window.style_result)
@@ -692,23 +660,23 @@ def create_source_check_tab(window) -> QWidget:
     encoding_layout.setSpacing(8)
 
     encoding_title = QLabel("字符集检查")
-    encoding_title.setStyleSheet("color: #1A1A1A; font-size: 13px; font-weight: 600;")
+    encoding_title.setStyleSheet("color: #D4D4D4; font-size: 13px; font-weight: 600;")
     encoding_layout.addWidget(encoding_title)
 
     window.encoding_status = QLabel("未检查")
-    window.encoding_status.setStyleSheet("color: #666666; font-size: 12px;")
+    window.encoding_status.setStyleSheet("color: #999999; font-size: 12px;")
     encoding_layout.addWidget(window.encoding_status)
 
     window.encoding_convert_btn = QPushButton("转换为 GB2312")
     window.encoding_convert_btn.setStyleSheet("""
         QPushButton {
-            background-color: #2563EB;
+            background-color: #0078D4;
             color: white;
             border: none;
             border-radius: 6px;
             padding: 8px 16px;
         }
-        QPushButton:hover { background-color: #1D4ED8; }
+        QPushButton:hover { background-color: #1A8CDC; }
     """)
     window.encoding_convert_btn.clicked.connect(window.convert_to_gb2312)
     window.encoding_convert_btn.hide()
@@ -717,11 +685,11 @@ def create_source_check_tab(window) -> QWidget:
     window.encoding_result = QTextEdit()
     window.encoding_result.setReadOnly(True)
     window.encoding_result.setStyleSheet("""
-        background-color: #FAFAFA;
+        background-color: #2D2D2D;
         border: none;
         border-radius: 6px;
         padding: 8px;
-        color: #1A1A1A;
+        color: #D4D4D4;
         font-size: 12px;
     """)
     encoding_layout.addWidget(window.encoding_result)

@@ -9,148 +9,6 @@ import re
 from pathlib import Path
 from typing import Dict, Any
 
-# ANSI color code to HTML color mapping
-ANSI_COLORS = {
-    30: "#1A1A1A",   # black
-    31: "#EF4444",   # red
-    32: "#22C55E",   # green
-    33: "#F59E0B",   # yellow
-    34: "#3B82F6",   # blue
-    35: "#A855F7",   # magenta
-    36: "#06B6D4",   # cyan
-    37: "#FFFFFF",   # white
-    90: "#666666",   # bright black (gray)
-    91: "#F87171",   # bright red
-    92: "#4ADE80",   # bright green
-    93: "#FACC15",   # bright yellow
-    94: "#60A5FA",   # bright blue
-    95: "#C084FC",   # bright magenta
-    96: "#22D3EE",   # bright cyan
-    97: "#FFFFFF",   # bright white
-}
-
-
-def ansi_to_html(text: str) -> str:
-    """
-    Convert txt_compare plain-text output to styled HTML.
-    txt_compare uses Windows Console API for colors, so we parse its
-    text output and render it with matching colors ourselves.
-
-    Color coding (from txt_compare footnotes):
-    - <CR> = cyan, <LF>/<CRLF> = green, <EOF> = red
-    - <VT>/<BS>/<BEL> = yellow/magenta
-    - Different position chars = red
-    """
-    if not text:
-        return ""
-
-    # Marker colors per txt_compare footnotes
-    marker_colors = {
-        'CR': "#06B6D4",    # cyan
-        'LF': "#22C55E",    # green
-        'CRLF': "#22C55E",  # green
-        'EOF': "#EF4444",   # red
-        'VT': "#A855F7",    # magenta
-        'BS': "#F59E0B",    # yellow
-        'BEL': "#F59E0B",   # yellow
-    }
-
-    def escape(t):
-        return (t
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\n", "<br/>")
-                .replace("\r", "")
-                .replace("\t", "&nbsp;&nbsp;&nbsp;&nbsp;"))
-
-    # Step 1: Parse diff info - find character position of first difference
-    # Format: [N/M] 从第[K]个字符开始进行比较
-    diff_pos = None
-    diff_match = re.search(r'第\[(\d+)\]个字符开始', text)
-    if diff_match:
-        diff_pos = int(diff_match.group(1))  # 1-indexed position
-
-    # Step 2: Parse file content lines and highlight diff chars
-    # Format: 文件N : content<CR><LF>
-    # We need to color the diff character in the content part
-    def color_file_line(line: str, diff_char_pos: int) -> str:
-        """Highlight the differing character in a file line."""
-        line = line.rstrip('\r')
-        # Try to extract content between " : " and marker
-        m = re.match(r'(文件\d+ : )(.*?)((?:<CR>|<LF>|<CRLF>)*)$', line)
-        if not m:
-            return escape(line)
-
-        prefix = m.group(1)
-        content = m.group(2)
-        suffix = m.group(3)
-
-        # diff_char_pos is 1-indexed, content is 0-indexed
-        idx = diff_char_pos - 1
-        if 0 <= idx < len(content):
-            before = content[:idx]
-            diff_char = content[idx]
-            after = content[idx + 1:]
-            return (
-                escape(prefix)
-                + escape(before)
-                + f'<span style="background-color: #EF4444; color: white; font-weight: bold;">{escape(diff_char)}</span>'
-                + escape(after)
-                + color_markers(suffix)
-            )
-        return escape(prefix) + escape(content) + color_markers(suffix)
-
-    def color_markers(s: str) -> str:
-        """Color <CR>, <LF>, etc."""
-        result = []
-        last_end = 0
-        for m in re.finditer(r'<(CR|LF|CRLF|EOF|VT|BS|BEL)([^>]*)>', s):
-            result.append(escape(s[last_end:m.start()]))
-            marker = m.group(1)
-            extra = m.group(2) or ""
-            # Check if there's a color indicator like (red) after the marker name
-            color = marker_colors.get(marker, "#F59E0B")
-            if '(' in extra:
-                color = "#EF4444"  # red for diff markers
-            result.append(f'<span style="color: {color}; font-weight: bold;">&lt;{marker}{extra}&gt;</span>')
-            last_end = m.end()
-        result.append(escape(s[last_end:]))
-        return "".join(result)
-
-    # Step 3: Process the full text, applying per-line coloring
-    result = []
-    # Find the character position for diff highlighting
-    diff_pos = None
-    diff_match = re.search(r'第\[(\d+)\]个字符开始', text)
-    if diff_match:
-        diff_pos = int(diff_match.group(1))
-
-    for line in text.split('\n'):
-        # Check if this is a file content line
-        if diff_pos is not None and re.match(r'文件\d+ : ', line):
-            result.append(color_file_line(line, diff_pos))
-        else:
-            # Process markers in other lines too
-            if re.search(r'<(CR|LF|CRLF|EOF|VT|BS|BEL)([^>]*)>', line):
-                result.append(color_markers(line))
-            else:
-                result.append(escape(line))
-        result.append('<br/>')
-
-    return "".join(result)
-
-
-def _escape_html(text: str) -> str:
-    """Escape HTML special characters."""
-    return (text
-            .replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("\n", "<br/>")
-            .replace("\r", "")
-            .replace("\t", "&nbsp;&nbsp;&nbsp;&nbsp;"))
-
 
 # PyQt6 imports
 from PyQt6.QtWidgets import (
@@ -158,8 +16,43 @@ from PyQt6.QtWidgets import (
     QApplication, QMessageBox, QLabel, QTextEdit, QScrollArea,
     QFileDialog, QPushButton, QSizePolicy, QDialog, QLineEdit
 )
-from PyQt6.QtCore import Qt, QSize, QThread, pyqtSignal
-from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import Qt, QSize, QThread, pyqtSignal, QTimer
+from PyQt6.QtGui import QIcon, QColor
+
+# termqt — embed real terminal for txt_compare output
+from termqt import Terminal
+from termqt.terminal_io_windows import TerminalWinptyIO
+
+# Patch termqt's hardcoded Qt.black to match dark theme
+import termqt.terminal_buffer as _tb
+import termqt.terminal_widget as _tw
+_term_bg = QColor("#1E1E1E")
+_tb.DEFAULT_BG_COLOR = _term_bg
+_tw.DEFAULT_BG_COLOR = _term_bg
+
+
+class RobustTerminalIO(TerminalWinptyIO):
+    """修补 termqt 未处理的 EOFError（PTY 关闭时 read() 抛异常）"""
+
+    def _read_loop(self):
+        try:
+            while self.running:
+                try:
+                    buf = self.pty_process.read()
+                except EOFError:
+                    break
+                if not buf:
+                    continue
+                if isinstance(buf, str):
+                    self.stdout_callback(bytes(buf, 'utf-8'))
+                else:
+                    self.stdout_callback(buf)
+        finally:
+            self.logger.info("Spawned process has been killed")
+            if self.running:
+                self.running = False
+                self.terminated_callback()
+
 
 # Import modules
 from core.checkdata import build_checkdata_content
@@ -172,16 +65,16 @@ from char.check_gb2312 import is_gb2312
 from char.convert_to_gb2312 import convert_file_to_gb2312, detect_encoding
 
 
-# Theme colors - Light theme (like Lite)
-COLOR_BG_LIGHT = "#F5F5F5"
-COLOR_BG_CARD = "#FFFFFF"
-COLOR_BORDER = "#E0E0E0"
-COLOR_TEXT_PRIMARY = "#1A1A1A"
-COLOR_TEXT_SECONDARY = "#666666"
-COLOR_ACCENT = "#2563EB"
-COLOR_SUCCESS = "#22C55E"
-COLOR_ERROR = "#EF4444"
-COLOR_WARNING = "#F59E0B"
+# Theme colors — VS Code-style dark
+COLOR_BG_LIGHT = "#1E1E1E"
+COLOR_BG_CARD = "#252526"
+COLOR_BORDER = "#3E3E3E"
+COLOR_TEXT_PRIMARY = "#D4D4D4"
+COLOR_TEXT_SECONDARY = "#999999"
+COLOR_ACCENT = "#0078D4"
+COLOR_SUCCESS = "#4ADE80"
+COLOR_ERROR = "#F87171"
+COLOR_WARNING = "#FBBF24"
 
 
 class ToolsConfigDialog(QDialog):
@@ -191,7 +84,7 @@ class ToolsConfigDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("配置外部工具")
         self.setMinimumWidth(520)
-        self.setStyleSheet("background: #F5F5F5;")
+        self.setStyleSheet("background: #2D2D2D;")
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
@@ -199,26 +92,26 @@ class ToolsConfigDialog(QDialog):
 
         hint = QLabel("请指定以下两个工具的路径（首次使用需配置，之后自动记住）：")
         hint.setWordWrap(True)
-        hint.setStyleSheet("color: #444; font-size: 12px;")
+        hint.setStyleSheet("color: #D4D4D4; font-size: 12px;")
         layout.addWidget(hint)
 
         btn_style = """
             QPushButton {
-                background-color: #2563EB; color: white;
+                background-color: #0078D4; color: white;
                 border: none; border-radius: 6px; padding: 6px 14px;
             }
-            QPushButton:hover { background-color: #1D4ED8; }
+            QPushButton:hover { background-color: #1A8CDC; }
         """
         edit_style = """
             QLineEdit {
-                background: white; border: 1px solid #E0E0E0;
-                border-radius: 6px; padding: 6px; color: #1A1A1A; font-size: 12px;
+                background: #3C3C3C; border: 1px solid #3E3E3E;
+                border-radius: 6px; padding: 6px; color: #D4D4D4; font-size: 12px;
             }
         """
 
         # get_input_data
         gid_label = QLabel("get_input_data.exe")
-        gid_label.setStyleSheet("color: #1A1A1A; font-size: 12px; font-weight: bold;")
+        gid_label.setStyleSheet("color: #D4D4D4; font-size: 12px; font-weight: bold;")
         layout.addWidget(gid_label)
         gid_row = QHBoxLayout()
         self.gid_edit = QLineEdit(gid_path)
@@ -233,7 +126,7 @@ class ToolsConfigDialog(QDialog):
 
         # txt_compare
         tc_label = QLabel("txt_compare.exe")
-        tc_label.setStyleSheet("color: #1A1A1A; font-size: 12px; font-weight: bold;")
+        tc_label.setStyleSheet("color: #D4D4D4; font-size: 12px; font-weight: bold;")
         layout.addWidget(tc_label)
         tc_row = QHBoxLayout()
         self.tc_edit = QLineEdit(tc_path)
@@ -255,10 +148,10 @@ class ToolsConfigDialog(QDialog):
         cancel_btn = QPushButton("取消")
         cancel_btn.setStyleSheet("""
             QPushButton {
-                background-color: transparent; color: #666;
-                border: 1px solid #E0E0E0; border-radius: 6px; padding: 6px 14px;
+                background-color: transparent; color: #999;
+                border: 1px solid #3E3E3E; border-radius: 6px; padding: 6px 14px;
             }
-            QPushButton:hover { background-color: #F0F0F0; }
+            QPushButton:hover { background-color: #3C3C3C; }
         """)
         cancel_btn.clicked.connect(self.reject)
         btn_row.addWidget(cancel_btn)
@@ -275,28 +168,35 @@ class ToolsConfigDialog(QDialog):
 
 
 class TestWorker(QThread):
-    """在后台线程运行比对函数，避免阻塞 UI"""
-    done = pyqtSignal(str, int)   # (txt_compare 原始输出, 用例数)
-    failed = pyqtSignal(str)      # 错误信息
+    """在后台线程准备比对数据（生成 temp 文件），避免阻塞 UI"""
+    ready = pyqtSignal(str, object)   # (command_string, cleanup_fn)
+    failed = pyqtSignal(str)          # 错误信息
 
-    def __init__(self, fn):
+    def __init__(self, prepare_fn):
         super().__init__()
-        self._fn = fn
+        self._prepare_fn = prepare_fn
 
     def run(self):
         try:
-            raw, count = self._fn()
-            self.done.emit(raw, count)
+            cmd, cleanup = self._prepare_fn()
+            self.ready.emit(cmd, cleanup)
         except Exception as e:
             self.failed.emit(str(e))
 
 
 class HypocWindow(QMainWindow):
     """Hypoc 主窗口"""
+
+    # 跨线程信号：终端 IO 完成后在 UI 线程处理
+    _term_done = pyqtSignal(object)
+
     def __init__(self):
         super().__init__()
-        self.file_paths = {}  # 存储各种文件路径
-        self.checkdata_content = ""  # checkdata文件内容
+        self.file_paths = {}
+        self.checkdata_content = ""
+        self._terminal = None
+        self._terminal_io = None
+        self._term_done.connect(self._on_terminal_complete)
         self.setup_window()
         self.setup_ui()
         self.populate_preset_checkdata()
@@ -346,7 +246,7 @@ class HypocWindow(QMainWindow):
         header_layout.setContentsMargins(0, 0, 0, 16)
 
         title = QLabel("Hypoc")
-        title.setStyleSheet("color: #1A1A1A; font-size: 20px; font-weight: bold;")
+        title.setStyleSheet("color: #D4D4D4; font-size: 20px; font-weight: bold;")
         header_layout.addWidget(title)
 
         hint = QLabel("程序测试与验证系统")
@@ -354,7 +254,7 @@ class HypocWindow(QMainWindow):
         header_layout.addWidget(hint)
 
         disclaimer = QLabel("水平有限，仅供参考")
-        disclaimer.setStyleSheet("color: #CCCCCC; font-size: 10px;")
+        disclaimer.setStyleSheet("color: #555555; font-size: 10px;")
         header_layout.addWidget(disclaimer)
 
         header_layout.addStretch()
@@ -368,21 +268,21 @@ class HypocWindow(QMainWindow):
                 background: transparent;
             }
             QTabBar::tab {
-                background: #FFFFFF;
-                color: #666666;
+                background: #2D2D2D;
+                color: #999999;
                 padding: 12px 32px;
-                border: 1px solid #E0E0E0;
+                border: 1px solid #3E3E3E;
                 border-radius: 8px;
                 margin-right: 8px;
                 font-size: 14px;
             }
             QTabBar::tab:selected {
-                background: #2563EB;
+                background: #0078D4;
                 color: white;
                 font-weight: bold;
             }
             QTabBar::tab:hover:!selected {
-                background: #F5F5F5;
+                background: #3C3C3C;
             }
         """)
         main_layout.addWidget(self.tab_widget)
@@ -412,14 +312,17 @@ class HypocWindow(QMainWindow):
 
         if path:
             self.file_paths[file_type] = path
+            name = Path(path).stem
 
             # Update label
             if file_type == "preset_exe":
                 self.preset_exe_label.setText(Path(path).name)
+                self._auto_select_problem(name, self.preset_problem_combo)
             elif file_type == "custom_demo":
                 self.custom_demo_label.setText(Path(path).name)
             elif file_type == "custom_user":
                 self.custom_user_label.setText(Path(path).name)
+                self._auto_select_problem(name, self.checkdata_preset_combo)
 
     def select_checkdata_file(self):
         """选择checkdata文件"""
@@ -432,12 +335,29 @@ class HypocWindow(QMainWindow):
             with open(path, 'r', encoding='utf-8') as f:
                 self.checkdata_content = f.read()
 
+    def _natural_key(self, s):
+        """自然排序键：将字符串中的数字段转为整数，实现 3-b5 < 3-b10"""
+        return [int(t) if t.isdigit() else t.lower() for t in re.split(r'(\d+)', s)]
+
+    def _auto_select_problem(self, exe_name, combo):
+        """根据 EXE 文件名自动匹配下拉框中的题目，匹配不到则保留当前选择"""
+        m = re.search(r'(\d+-b\d+(?:-\d+)?)', exe_name)
+        if not m:
+            return
+        pid = m.group(1)
+        idx = combo.findText(pid)
+        if idx >= 0:
+            combo.setCurrentIndex(idx)
+
     def populate_preset_checkdata(self):
         """用 data/checkdata/ 里的文件填充预设 checkdata 下拉框"""
         from core.comparison import CHECKDATA_DIR
         self.checkdata_preset_combo.clear()
         if CHECKDATA_DIR.exists():
-            names = sorted(p.stem for p in CHECKDATA_DIR.glob("*.txt"))
+            names = sorted(
+                (p.stem for p in CHECKDATA_DIR.glob("*.txt")),
+                key=self._natural_key
+            )
             self.checkdata_preset_combo.addItems(names)
 
     def select_source_file(self):
@@ -630,40 +550,82 @@ class HypocWindow(QMainWindow):
         return gid, tc
 
     # ==========================================================================
-    # 测试结果共享处理
+    # 测试结果共享处理（termqt 终端）
     # ==========================================================================
 
-    def _start_test(self, work_fn, cleanup_fn=None):
-        """启动后台测试线程，work_fn 返回 (raw_output, case_count)"""
-        self.output_status.setText("运行中...")
-        self.output_status.setStyleSheet("color: #2563EB;")
-        self.output_start_btn.setEnabled(False)
+    def _clear_terminal(self):
+        """移除旧终端 widget，终止旧 IO"""
+        if hasattr(self, '_terminal_io') and self._terminal_io:
+            try:
+                self._terminal_io.terminate()
+            except Exception:
+                pass
+            self._terminal_io = None
 
-        while self.output_results_container.count():
-            child = self.output_results_container.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
+        if hasattr(self, '_terminal') and self._terminal:
+            try:
+                self.terminal_layout.removeWidget(self._terminal)
+                self._terminal.deleteLater()
+            except Exception:
+                pass
+            self._terminal = None
 
-        self._worker = TestWorker(work_fn)
-        self._worker.done.connect(self._on_test_done)
-        self._worker.failed.connect(self._on_test_failed)
-        if cleanup_fn:
-            self._worker.finished.connect(cleanup_fn)
-        self._worker.start()
+    def _create_terminal(self, cmd, cleanup_fn):
+        """创建 termqt Terminal widget 并执行 txt_compare"""
+        self._clear_terminal()
 
-    def _on_test_done(self, raw, count):
-        result_edit = QTextEdit()
-        result_edit.setReadOnly(True)
-        result_edit.setHtml(ansi_to_html(raw))
-        result_edit.setStyleSheet(
-            "background: #1E1E1E; border: none; "
-            "font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 12px; "
-            "color: #D4D4D4; padding: 8px;"
+        cw = self.terminal_container.width()
+        ch = self.terminal_container.height()
+        if cw < 100:
+            cw, ch = 800, 500
+
+        terminal = Terminal(cw, ch, padding=6, font_size=11)
+        terminal.set_bg(QColor("#1E1E1E"))
+        terminal.set_fg(QColor("#D4D4D4"))
+        self.terminal_layout.addWidget(terminal)
+        terminal.show()
+
+        io = RobustTerminalIO(
+            cols=terminal.row_len,
+            rows=terminal.col_len,
+            cmd=cmd
         )
-        self.output_results_container.addWidget(result_edit)
-        self.output_status.setText(f"完成 ({count} 组)")
+        io.stdout_callback = terminal.stdout
+        io.terminated_callback = lambda: self._term_done.emit(cleanup_fn)
+
+        self._terminal = terminal
+        self._terminal_io = io
+
+        io.spawn()
+
+    def _on_terminal_complete(self, cleanup_fn):
+        """txt_compare 运行完毕，清理临时文件"""
+        try:
+            if cleanup_fn:
+                cleanup_fn()
+        except Exception:
+            pass
+        self.output_status.setText("完成")
         self.output_status.setStyleSheet(f"color: {COLOR_SUCCESS};")
         self.output_start_btn.setEnabled(True)
+
+    def _start_test(self, prepare_fn):
+        """启动后台准备线程，prepare_fn 返回 (cmd_string, cleanup_fn)"""
+        self.output_status.setText("准备中...")
+        self.output_status.setStyleSheet("color: #0078D4;")
+        self.output_start_btn.setEnabled(False)
+
+        self._clear_terminal()
+
+        self._worker = TestWorker(prepare_fn)
+        self._worker.ready.connect(self._on_test_ready)
+        self._worker.failed.connect(self._on_test_failed)
+        self._worker.start()
+
+    def _on_test_ready(self, cmd, cleanup_fn):
+        """数据准备好，创建终端执行 txt_compare"""
+        self.output_status.setText("运行中...")
+        self._create_terminal(cmd, cleanup_fn)
 
     def _on_test_failed(self, msg):
         self.output_status.setText(f"错误: {msg}")
@@ -677,7 +639,7 @@ class HypocWindow(QMainWindow):
     def run_preset_test(self):
         """运行预设模式测试（get_input_data + txt_compare）"""
         import json, tempfile, os
-        from core.ext_comparison import run_preset_external_comparison, parse_data_file
+        from core.ext_comparison import prepare_preset_comparison, parse_data_file
         from core.comparison import get_base_dir, CHECKDATA_DIR, DEMORAW_DIR
 
         exe_path = self.file_paths.get("preset_exe")
@@ -710,38 +672,43 @@ class HypocWindow(QMainWindow):
             os.close(fd)
             with open(checkdata_path, "w", encoding="utf-8") as f:
                 f.write(content)
-            cleanup_fn = lambda: os.path.exists(checkdata_path) and os.unlink(checkdata_path)
+            cleanup_checkdata = lambda: os.path.exists(checkdata_path) and os.unlink(checkdata_path)
         else:
             checkdata_path = str(checkdata_file)
-            cleanup_fn = None
+            cleanup_checkdata = None
 
         tools = self._get_tools()
         if tools is None:
-            if cleanup_fn:
-                cleanup_fn()
+            if cleanup_checkdata:
+                cleanup_checkdata()
             return
         gid_exe, tc_exe = tools
 
         case_ids = parse_data_file(checkdata_path)
+        tc_params = self._get_tc_params()
 
-        def work():
-            raw = run_preset_external_comparison(
+        def prepare():
+            cmd, cleanup_tmp = prepare_preset_comparison(
                 data_file=checkdata_path,
                 case_ids=case_ids,
                 user_exe=exe_path,
                 gid_exe=gid_exe,
                 tc_exe=tc_exe,
                 expected_hex_map=expected_hex_map,
-                tc_params=self._get_tc_params(),
+                tc_params=tc_params,
             )
-            return raw, len(case_ids)
+            def cleanup_all():
+                cleanup_tmp()
+                if cleanup_checkdata:
+                    cleanup_checkdata()
+            return cmd, cleanup_all
 
-        self._start_test(work, cleanup_fn)
+        self._start_test(prepare)
 
     def run_custom_test(self):
         """运行自定义模式测试（get_input_data + txt_compare）"""
         import tempfile, os
-        from core.ext_comparison import run_external_comparison, parse_data_file
+        from core.ext_comparison import prepare_custom_comparison, parse_data_file
         from core.comparison import CHECKDATA_DIR
 
         demo_path = self.file_paths.get("custom_demo")
@@ -755,7 +722,7 @@ class HypocWindow(QMainWindow):
             return
 
         tab_idx = self.checkdata_tabs.currentIndex()
-        cleanup_fn = None
+        cleanup_checkdata = None
 
         if tab_idx == 0:  # 预设
             name = self.checkdata_preset_combo.currentText()
@@ -777,12 +744,12 @@ class HypocWindow(QMainWindow):
             os.close(fd)
             with open(checkdata_path, "w", encoding="utf-8") as f:
                 f.write(content)
-            cleanup_fn = lambda: os.path.exists(checkdata_path) and os.unlink(checkdata_path)
+            cleanup_checkdata = lambda: os.path.exists(checkdata_path) and os.unlink(checkdata_path)
 
         tools = self._get_tools()
         if tools is None:
-            if cleanup_fn:
-                cleanup_fn()
+            if cleanup_checkdata:
+                cleanup_checkdata()
             return
         gid_exe, tc_exe = tools
 
@@ -790,23 +757,29 @@ class HypocWindow(QMainWindow):
         if not case_ids:
             self.output_status.setText("Checkdata 文件中没有找到测试用例")
             self.output_status.setStyleSheet(f"color: {COLOR_ERROR};")
-            if cleanup_fn:
-                cleanup_fn()
+            if cleanup_checkdata:
+                cleanup_checkdata()
             return
 
-        def work():
-            raw = run_external_comparison(
+        tc_params = self._get_tc_params()
+
+        def prepare():
+            cmd, cleanup_tmp = prepare_custom_comparison(
                 data_file=checkdata_path,
                 case_ids=case_ids,
                 user_exe=user_path,
                 gid_exe=gid_exe,
                 tc_exe=tc_exe,
                 demo_exe=demo_path,
-                tc_params=self._get_tc_params(),
+                tc_params=tc_params,
             )
-            return raw, len(case_ids)
+            def cleanup_all():
+                cleanup_tmp()
+                if cleanup_checkdata:
+                    cleanup_checkdata()
+            return cmd, cleanup_all
 
-        self._start_test(work, cleanup_fn)
+        self._start_test(prepare)
 
 
 class CheckpointEntry(QWidget):
@@ -824,7 +797,7 @@ class CheckpointEntry(QWidget):
         # 自动生成的 case_id（只读显示）
         case_id_label = QLabel(f"#{self.index + 1:02d}")
         case_id_label.setStyleSheet("""
-            color: #666666;
+            color: #999999;
             font-size: 12px;
             font-weight: bold;
             min-width: 30px;
@@ -835,11 +808,11 @@ class CheckpointEntry(QWidget):
         self.input_val.setMinimumHeight(150)
         self.input_val.setMaximumHeight(250)
         self.input_val.setStyleSheet("""
-            border: 1px solid #E0E0E0;
+            border: 1px solid #3E3E3E;
             border-radius: 6px;
             padding: 4px;
-            background: white;
-            color: #1A1A1A;
+            background: #2D2D2D;
+            color: #D4D4D4;
         """)
 
         self.delete_btn = QPushButton("×")

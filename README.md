@@ -1,11 +1,11 @@
 # Hypoc - 程序测试与验证系统
 
-基于程序测试与验证工具，支持输出比对（外部工具链）、源码格式检查和字符集检测。
+基于 PyQt6 的程序测试与验证工具，支持输出比对（外部工具链）、源码格式检查和字符集检测。
 
 ## 功能特性
 
 ### 输出检查
-使用 `get_input_data` + `txt_compare` 外部工具链进行比对，复现真实测试环境。
+使用 `get_input_data` + `txt_compare` 外部工具链进行比对，输出通过真终端 (termqt) 原生渲染，完整保留控制台颜色。
 
 - **预设模式**：从 `data/checkdata/` 自动加载题目测试数据，期望输出从内置 JSON 还原
 - **自定义模式**：上传 Demo 程序和用户程序进行对比
@@ -25,9 +25,13 @@
 5-b8, 5-b9, 5-b10, 5-b15, 5-b16, 5-b17, 5-b18,
 6-b1, 6-b2, 6-b3
 
-## 运行
+## 安装 & 运行
 
 ```bash
+# 安装依赖
+pip install pyqt6 termqt pywinpty
+
+# 运行
 python main.py
 ```
 
@@ -46,7 +50,7 @@ Hypoc/
 ├── main.py              # 主程序入口 + 窗口类
 ├── build.py             # Nuitka 打包脚本
 ├── core/
-│   ├── comparison.py    # 预设模式比对（get_base_dir 等工具路径）
+│   ├── comparison.py    # 预设模式比对
 │   ├── checkdata.py     # checkdata 格式解析与构建
 │   └── ext_comparison.py # 外部工具比对逻辑
 ├── ui/
@@ -66,4 +70,6 @@ Hypoc/
 
 - Python 3.8+
 - PyQt6 >= 6.4.0
+- termqt（终端渲染）
+- pywinpty（Windows ConPTY 支持）
 - Nuitka >= 2.0（仅打包用）

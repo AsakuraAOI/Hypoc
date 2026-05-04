@@ -8,7 +8,7 @@ import tempfile
 import os
 import subprocess
 from pathlib import Path
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Tuple
 
 
 def locate_tools(base_dir: str) -> tuple:
@@ -138,6 +138,62 @@ def run_case_via_pipe(gid_exe: str, data_file: str, case_id: str,
         return "[超时]\r\n".encode("gbk")
 
 
+def prepare_custom_comparison(
+    data_file: str,
+    case_ids: List[str],
+    user_exe: str,
+    gid_exe: str,
+    tc_exe: str,
+    demo_output_file: Optional[str] = None,
+    demo_exe: Optional[str] = None,
+    tc_params: Optional[Dict[str, Any]] = None,
+) -> Tuple[str, callable]:
+    """
+    准备自定义比对：生成临时文件，返回 txt_compare 命令行和清理函数。
+
+    Returns: (cmd_string, cleanup_fn)
+      cmd_string: 完整的 txt_compare 命令行（供 PTY 执行）
+      cleanup_fn: 调用以删除临时文件
+    """
+    act_fd, actual_path = tempfile.mkstemp(suffix='.txt')
+    os.close(act_fd)
+
+    cleanup_expected = False
+    expected_path = None
+
+    with open(actual_path, 'wb') as act_f:
+        for cid in case_ids:
+            out = run_case_via_pipe(gid_exe, data_file, cid, user_exe)
+            act_f.write(out)
+
+    if demo_output_file:
+        expected_path = demo_output_file
+    else:
+        exp_fd, expected_path = tempfile.mkstemp(suffix='.txt')
+        os.close(exp_fd)
+        cleanup_expected = True
+        with open(expected_path, 'wb') as exp_f:
+            for cid in case_ids:
+                out = run_case_via_pipe(gid_exe, data_file, cid, demo_exe)
+                exp_f.write(out)
+
+    tc_args = _build_tc_args(tc_params)
+    cmd_parts = [
+        tc_exe,
+        '--file1', actual_path,
+        '--file2', expected_path,
+        '--display', 'detailed'
+    ] + tc_args
+
+    def cleanup():
+        if os.path.exists(actual_path):
+            os.unlink(actual_path)
+        if cleanup_expected and expected_path and os.path.exists(expected_path):
+            os.unlink(expected_path)
+
+    return subprocess.list2cmdline(cmd_parts), cleanup
+
+
 def run_external_comparison(
     data_file: str,
     case_ids: List[str],
@@ -149,53 +205,64 @@ def run_external_comparison(
     tc_params: Optional[Dict[str, Any]] = None,
 ) -> str:
     """
-    运行所有 case，对比，返回 txt_compare 的 stdout 文本。
-
-    预设模式：demo_output_file 是已有的期望输出文件
-    自定义模式：demo_exe 实时运行生成期望输出
+    运行所有 case，对比，返回 txt_compare 的 stdout 文本（用于 CLI 模式）。
     """
-    # 生成实际输出临时文件
-    act_fd, actual_path = tempfile.mkstemp(suffix='.txt')
-    os.close(act_fd)
-
-    cleanup_expected = False
-    expected_path = None
-
+    cmd, cleanup = prepare_custom_comparison(
+        data_file, case_ids, user_exe, gid_exe, tc_exe,
+        demo_output_file, demo_exe, tc_params
+    )
     try:
-        with open(actual_path, 'wb') as act_f:
-            for cid in case_ids:
-                out = run_case_via_pipe(gid_exe, data_file, cid, user_exe)
-                act_f.write(out)
-
-        if demo_output_file:
-            expected_path = demo_output_file
-        else:
-            exp_fd, expected_path = tempfile.mkstemp(suffix='.txt')
-            os.close(exp_fd)
-            cleanup_expected = True
-            with open(expected_path, 'wb') as exp_f:
-                for cid in case_ids:
-                    out = run_case_via_pipe(gid_exe, data_file, cid, demo_exe)
-                    exp_f.write(out)
-
-        tc_args = _build_tc_args(tc_params)
-        result = subprocess.run(
-            [tc_exe,
-             '--file1', actual_path,
-             '--file2', expected_path,
-             '--display', 'detailed']
-            + tc_args,
-            capture_output=True, timeout=120
-        )
+        result = subprocess.run(cmd, capture_output=True, timeout=120, shell=True)
         output = result.stdout.decode('gbk', errors='replace')
         if result.stderr:
             output += "\n[stderr]\n" + result.stderr.decode('gbk', errors='replace')
         return output
-
     finally:
-        os.unlink(actual_path)
-        if cleanup_expected and expected_path:
+        cleanup()
+
+
+def prepare_preset_comparison(
+    data_file: str,
+    case_ids: List[str],
+    user_exe: str,
+    gid_exe: str,
+    tc_exe: str,
+    expected_hex_map: Dict[str, str],
+    tc_params: Optional[Dict[str, Any]] = None,
+) -> Tuple[str, callable]:
+    """
+    准备预设比对：生成临时文件，返回 txt_compare 命令行和清理函数。
+
+    Returns: (cmd_string, cleanup_fn)
+    """
+    act_fd, actual_path = tempfile.mkstemp(suffix='.txt')
+    exp_fd, expected_path = tempfile.mkstemp(suffix='.txt')
+    os.close(act_fd)
+    os.close(exp_fd)
+
+    with open(actual_path, 'wb') as act_f, open(expected_path, 'wb') as exp_f:
+        for cid in case_ids:
+            out = run_case_via_pipe(gid_exe, data_file, cid, user_exe)
+            act_f.write(out)
+            hex_str = expected_hex_map.get(cid, "")
+            if hex_str:
+                exp_f.write(bytes.fromhex(hex_str))
+
+    tc_args = _build_tc_args(tc_params)
+    cmd_parts = [
+        tc_exe,
+        '--file1', actual_path,
+        '--file2', expected_path,
+        '--display', 'detailed'
+    ] + tc_args
+
+    def cleanup():
+        if os.path.exists(actual_path):
+            os.unlink(actual_path)
+        if os.path.exists(expected_path):
             os.unlink(expected_path)
+
+    return subprocess.list2cmdline(cmd_parts), cleanup
 
 
 def run_preset_external_comparison(
@@ -204,42 +271,22 @@ def run_preset_external_comparison(
     user_exe: str,
     gid_exe: str,
     tc_exe: str,
-    expected_hex_map: Dict[str, str],  # {case_id: output_hex}
+    expected_hex_map: Dict[str, str],
     tc_params: Optional[Dict[str, Any]] = None,
 ) -> str:
     """
     预设模式：期望输出从 JSON 的 output_hex 还原，实际输出通过 get_input_data | user_exe 生成。
+    返回 txt_compare stdout 文本（用于 CLI 模式）。
     """
-    act_fd, actual_path = tempfile.mkstemp(suffix='.txt')
-    exp_fd, expected_path = tempfile.mkstemp(suffix='.txt')
-    os.close(act_fd)
-    os.close(exp_fd)
-
+    cmd, cleanup = prepare_preset_comparison(
+        data_file, case_ids, user_exe, gid_exe, tc_exe,
+        expected_hex_map, tc_params
+    )
     try:
-        with open(actual_path, 'wb') as act_f, open(expected_path, 'wb') as exp_f:
-            for cid in case_ids:
-                # 实际输出
-                out = run_case_via_pipe(gid_exe, data_file, cid, user_exe)
-                act_f.write(out)
-                # 期望输出：从 hex 还原字节
-                hex_str = expected_hex_map.get(cid, "")
-                if hex_str:
-                    exp_f.write(bytes.fromhex(hex_str))
-
-        tc_args = _build_tc_args(tc_params)
-        result = subprocess.run(
-            [tc_exe,
-             '--file1', actual_path,
-             '--file2', expected_path,
-             '--display', 'detailed']
-            + tc_args,
-            capture_output=True, timeout=120
-        )
+        result = subprocess.run(cmd, capture_output=True, timeout=120, shell=True)
         output = result.stdout.decode('gbk', errors='replace')
         if result.stderr:
             output += "\n[stderr]\n" + result.stderr.decode('gbk', errors='replace')
         return output
-
     finally:
-        os.unlink(actual_path)
-        os.unlink(expected_path)
+        cleanup()

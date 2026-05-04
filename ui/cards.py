@@ -5,18 +5,18 @@ UI组件模块 - 基础组件
 
 from PyQt6.QtWidgets import QFrame, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit
 
-# Theme colors - Clean light theme (like Lite)
-COLOR_BG_LIGHT = "#F5F5F5"
-COLOR_BG_CARD = "#FFFFFF"
-COLOR_BORDER = "#E0E0E0"
-COLOR_TEXT_PRIMARY = "#1A1A1A"
-COLOR_TEXT_SECONDARY = "#666666"
-COLOR_ACCENT = "#2563EB"
-COLOR_ACCENT_HOVER = "#1D4ED8"
-COLOR_SUCCESS = "#22C55E"
-COLOR_ERROR = "#EF4444"
-COLOR_WARNING = "#F59E0B"
-COLOR_CRITICAL = "#DC2626"
+# Theme colors — VS Code-style dark
+COLOR_BG_LIGHT = "#1E1E1E"
+COLOR_BG_CARD = "#252526"
+COLOR_BORDER = "#3E3E3E"
+COLOR_TEXT_PRIMARY = "#D4D4D4"
+COLOR_TEXT_SECONDARY = "#999999"
+COLOR_ACCENT = "#0078D4"
+COLOR_ACCENT_HOVER = "#1A8CDC"
+COLOR_SUCCESS = "#4ADE80"
+COLOR_ERROR = "#F87171"
+COLOR_WARNING = "#FBBF24"
+COLOR_CRITICAL = "#EF4444"
 
 
 class GlassCard(QFrame):
@@ -43,7 +43,7 @@ class ResultCard(QFrame):
     def setup_ui(self):
         self.setObjectName("ResultCard")
         is_pass = self.result.status == "PASS"
-        card_bg = "#E8F5E9" if is_pass else "#FFEBEE"
+        card_bg = "#1A3A2A" if is_pass else "#3A1A1A"
         border_color = COLOR_SUCCESS if is_pass else COLOR_ERROR
 
         self.setStyleSheet(f"""
@@ -65,7 +65,7 @@ class ResultCard(QFrame):
         status_label.setStyleSheet(f"color: {border_color}; font-size: 14px; font-weight: bold;")
 
         case_label = QLabel(f"#{self.result.case_id}")
-        case_label.setStyleSheet("color: #1A1A1A; font-size: 14px; font-weight: 600;")
+        case_label.setStyleSheet("color: #D4D4D4; font-size: 14px; font-weight: 600;")
 
         header_layout.addWidget(status_label)
         header_layout.addWidget(case_label)
@@ -75,12 +75,12 @@ class ResultCard(QFrame):
 
         # Input
         input_label = QLabel("输入:")
-        input_label.setStyleSheet("color: #666666; font-size: 11px;")
+        input_label.setStyleSheet("color: #999999; font-size: 11px;")
         layout.addWidget(input_label)
 
         input_text = QTextEdit(self.result.input_val)
         input_text.setStyleSheet(f"""
-            background-color: #FAFAFA;
+            background-color: #2D2D2D;
             border: none;
             border-radius: 6px;
             color: {COLOR_TEXT_PRIMARY};
@@ -94,7 +94,7 @@ class ResultCard(QFrame):
         # Output section
         output_frame = QFrame()
         output_frame.setStyleSheet(f"""
-            background-color: #FAFAFA;
+            background-color: #2D2D2D;
             border-radius: 6px;
             padding: 8px;
         """)
@@ -103,7 +103,7 @@ class ResultCard(QFrame):
 
         # Expected
         exp_label = QLabel("期望:")
-        exp_label.setStyleSheet("color: #666666; font-size: 11px;")
+        exp_label.setStyleSheet("color: #999999; font-size: 11px;")
         output_layout.addWidget(exp_label)
 
         exp_text = QTextEdit(self.result.expected_text)
@@ -119,7 +119,7 @@ class ResultCard(QFrame):
 
         # Actual
         actual_label = QLabel("实际:")
-        actual_label.setStyleSheet("color: #666666; font-size: 11px;")
+        actual_label.setStyleSheet("color: #999999; font-size: 11px;")
         output_layout.addWidget(actual_label)
 
         actual_text = QTextEdit(self.result.actual_text)
@@ -147,7 +147,7 @@ class ResultCard(QFrame):
             diff_label.setStyleSheet(f"""
                 color: {COLOR_WARNING};
                 font-size: 11px;
-                background-color: #FFF8E1;
+                background-color: #3A2E00;
                 border-radius: 6px;
                 padding: 6px;
             """)
@@ -156,7 +156,7 @@ class ResultCard(QFrame):
         # HEX section
         hex_frame = QFrame()
         hex_frame.setStyleSheet("""
-            background-color: #F0F0F0;
+            background-color: #333333;
             border-radius: 6px;
             padding: 8px;
         """)
@@ -164,12 +164,12 @@ class ResultCard(QFrame):
         hex_layout.setSpacing(4)
 
         hex_title = QLabel("HEX:")
-        hex_title.setStyleSheet("color: #666666; font-size: 11px; font-weight: bold;")
+        hex_title.setStyleSheet("color: #999999; font-size: 11px; font-weight: bold;")
         hex_layout.addWidget(hex_title)
 
         # Expected HEX
         exp_hex_label = QLabel("期望:")
-        exp_hex_label.setStyleSheet("color: #666666; font-size: 10px;")
+        exp_hex_label.setStyleSheet("color: #999999; font-size: 10px;")
         hex_layout.addWidget(exp_hex_label)
 
         exp_hex_text = QTextEdit(self.result.expected_hex)
@@ -186,7 +186,7 @@ class ResultCard(QFrame):
 
         # Actual HEX
         actual_hex_label = QLabel("实际:")
-        actual_hex_label.setStyleSheet("color: #666666; font-size: 10px;")
+        actual_hex_label.setStyleSheet("color: #999999; font-size: 10px;")
         hex_layout.addWidget(actual_hex_label)
 
         actual_hex_text = QTextEdit(self.result.actual_hex)
